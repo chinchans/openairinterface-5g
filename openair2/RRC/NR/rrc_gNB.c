@@ -511,6 +511,8 @@ static void rrc_gNB_process_RRCSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
 {
   UE->Srb[1].Active = 1;
   UE->Srb[2].Active = 0;
+  
+  rrcSetupComplete=NULL;
 
   rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
 }
@@ -1216,16 +1218,6 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
     gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
     UE->Initialue_identity_5g_s_TMSI.presence = true;
     UE->ng_5G_S_TMSI_Part1 = s_tmsi_part1;
-  } else {
-    uint64_t random_value = 0;
-    memcpy(((uint8_t *)&random_value) + 3,
-           rrcSetupRequest->ue_Identity.choice.randomValue.buf,
-           rrcSetupRequest->ue_Identity.choice.randomValue.size);
-
-    ue_context_p = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
-    LOG_E(NR_RRC, "RRCSetupRequest without random UE identity or S-TMSI not supported, let's reject the UE %04x\n", msg->crnti);
-    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
-    return;
   }
 
   // If the DU to CU RRC Container IE is not included in the INITIAL UL RRC MESSAGE TRANSFER,
