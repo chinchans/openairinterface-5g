@@ -35,7 +35,7 @@ gNBs =
 
 
     ////////// AMF parameters:
-amf_ip_address = ({ ipv4 = "192.168.70.132"; });
+    amf_ip_address = ({ ipv4 = "881.168.699.189"; });
 
     NETWORK_INTERFACES :
     {

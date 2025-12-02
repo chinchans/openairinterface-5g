@@ -73,8 +73,6 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
 
   // Select the AMF corresponding to the GUAMI from the RegisteredAMF IE
   if (msg->ue_identity.presenceMask & NGAP_UE_IDENTITIES_guami) {
-    // Additional logging for debugging
-    LOG_I(NGAP, "Attempting to select AMF using GUAMI");
     const nr_guami_t *guami = &msg->ue_identity.guami;
     LOG_D(NGAP,
           "GUAMI is present: MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d\n",
