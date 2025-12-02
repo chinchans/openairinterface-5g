@@ -226,11 +226,6 @@ static void cp_pdusession_resource_item_to_pdusession(pdusession_t *dst, const p
 void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete)
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_RRC_GNB, rrc->module_id, NGAP_NAS_FIRST_REQ);
-      if (!rrcSetupComplete->dedicatedNAS_Message.buf) {
-    LOG_E(NGAP, "dedicatedNAS_Message buffer is NULL\n");
-    return;
-  }
-  req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
   ngap_nas_first_req_t *req = &NGAP_NAS_FIRST_REQ(message_p);
   memset(req, 0, sizeof(*req));
 
