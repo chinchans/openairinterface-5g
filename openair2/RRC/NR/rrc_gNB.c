@@ -1526,7 +1526,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
           nr_rrc_du_container_t *source_du = get_du_by_cell_id(rrc, serving_cell->nr_cellid);
           DevAssert(source_du);
           nr_rrc_du_container_t *target_du = get_du_by_cell_id(rrc, neigh_cell->nr_cellid);
-          nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+          nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du, false);
         } else {
           LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbour_pci);
         }
@@ -2267,6 +2267,20 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   UE->f1_ue_context_active = true;
+
+  if (resp->requested_target_cell_plmn && resp->requested_target_cell_nr_cellid) {
+    LOG_I(NR_RRC,
+          "UE %u: UE Context Setup Response includes requestedTargetCellGlobalID (LTM / target echo), NRCellIdentity "
+          "0x%010llx\n",
+          resp->gNB_CU_ue_id,
+          (unsigned long long)(*resp->requested_target_cell_nr_cellid & 0x0FFFFFFFFFFFL));
+  }
+  if (resp->early_sync_information || resp->ltm_configuration) {
+    LOG_I(NR_RRC,
+          "UE %u: optional LTM containers (EarlySyncInformation / LTMConfiguration) present in decoded struct; OTA "
+          "requires Rel-18 F1AP\n",
+          resp->gNB_CU_ue_id);
+  }
 
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
   byte_array_t *cgc = &resp->du_to_cu_rrc_info.cell_group_config;

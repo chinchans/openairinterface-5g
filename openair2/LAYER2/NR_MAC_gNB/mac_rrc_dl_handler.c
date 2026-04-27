@@ -714,6 +714,15 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     resp.du_to_cu_rrc_info.meas_gap_config = mgc;
   }
 
+  /* Inter-gNB DU LTM (TS 38.473): if LTM indicator is set, echo SpCell ID as Requested Target Cell ID */
+  if (req->ltm_information_setup && req->ltm_information_setup->ltm_indicator) {
+    resp.requested_target_cell_plmn = malloc_or_fail(sizeof(*resp.requested_target_cell_plmn));
+    *resp.requested_target_cell_plmn = req->plmn;
+    resp.requested_target_cell_nr_cellid = malloc_or_fail(sizeof(*resp.requested_target_cell_nr_cellid));
+    *resp.requested_target_cell_nr_cellid = req->nr_cellid;
+    LOG_I(NR_MAC, "UE Context Setup (LTM): requestedTargetCellGlobalID = SpCell NRCGI (UE RNTI %x)\n", UE->rnti);
+  }
+
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
   mac->mac_rrc.ue_context_setup_response(&resp);

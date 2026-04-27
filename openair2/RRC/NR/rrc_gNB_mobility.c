@@ -125,7 +125,8 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
                                  ho_req_ack_t ack,
                                  ho_success_t success,
                                  ho_cancel_t cancel,
-                                 ho_failure_t failure)
+                                 ho_failure_t failure,
+                                 bool inter_gnb_du_ltm)
 {
   DevAssert(rrc != NULL);
   DevAssert(ue != NULL);
@@ -217,6 +218,20 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
       .cu_to_du_rrc_info.meas_timing_config = meas_timing_config,
       .gnb_du_ue_agg_mbr_ul = ue_agg_mbr,
   };
+  if (inter_gnb_du_ltm) {
+    /* TS 38.473 / 38.401: Inter-gNB DU LTM handover — internal LTMInformation-Setup (OTA IEs need Rel-18 F1AP) */
+    f1ap_ltm_information_setup_t *ltm = calloc_or_fail(1, sizeof(*ltm));
+    ltm->ltm_indicator = true;
+    f1ap_ltm_reference_configuration_t *ref = calloc_or_fail(1, sizeof(*ref));
+    ref->choice = F1AP_LTM_REF_CFG_REQUEST_LOWER_LAYER;
+    ref->request_for_lower_layer = true;
+    ltm->reference_configuration = ref;
+    ue_context_setup_req.ltm_information_setup = ltm;
+    LOG_I(NR_RRC,
+          "UE %u: Inter-gNB DU LTM: UE Context Setup Request includes LTM (candidate SpCell 0x%llx)\n",
+          ue->rrc_ue_id,
+          (unsigned long long)cell_info->nr_cellid);
+  }
   rrc->mac_rrc.ue_context_setup_request(target_du->assoc_id, &ue_context_setup_req);
   free_ue_context_setup_req(&ue_context_setup_req);
 }
@@ -332,7 +347,11 @@ static void nr_rrc_cancel_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   rrc->mac_rrc.ue_context_release_command(target_ctx->du->assoc_id, &cmd);
 }
 
-void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
+void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc,
+                          gNB_RRC_UE_t *ue,
+                          nr_rrc_du_container_t *source_du,
+                          nr_rrc_du_container_t *target_du,
+                          bool inter_gnb_du_ltm)
 {
   DevAssert(rrc != NULL);
   DevAssert(ue != NULL);
@@ -357,7 +376,7 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   ho_success_t success = nr_rrc_f1_ho_complete;
   ho_cancel_t cancel = nr_rrc_cancel_f1_ho;
   byte_array_t hpi = {.buf = buf, .len = size};
-  nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel, NULL);
+  nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel, NULL, inter_gnb_du_ltm);
 }
 
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue)
@@ -389,7 +408,31 @@ void nr_HO_F1_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id)
     return;
   }
 
-  nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+  nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du, false);
+}
+
+void nr_HO_F1_inter_du_ltm_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id)
+{
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, rrc_ue_id);
+  if (ue_context_p == NULL) {
+    LOG_E(NR_RRC, "cannot find UE context for UE ID %d\n", rrc_ue_id);
+    return;
+  }
+  gNB_RRC_UE_t *ue = &ue_context_p->ue_context;
+  nr_rrc_du_container_t *source_du = get_du_for_ue(rrc, ue->rrc_ue_id);
+  if (source_du == NULL) {
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(rrc_ue_id);
+    LOG_E(NR_RRC, "cannot get source gNB-DU with assoc_id %d for UE %u\n", ue_data.du_assoc_id, ue->rrc_ue_id);
+    return;
+  }
+
+  nr_rrc_du_container_t *target_du = find_target_du(rrc, source_du->assoc_id);
+  if (target_du == NULL) {
+    LOG_E(NR_RRC, "No target gNB-DU found. Inter-gNB DU LTM handover for UE %u aborted.\n", ue->rrc_ue_id);
+    return;
+  }
+
+  nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du, true);
 }
 
 /** @brief Generate the HandoverPreparationInformation to be carried
@@ -525,7 +568,7 @@ void nr_rrc_trigger_n2_ho_target(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue)
   ho_failure_t failure = nr_rrc_n2_ho_failure;
 
   const nr_rrc_du_container_t *target_du = get_du_for_ue(rrc, ue->rrc_ue_id);
-  nr_initiate_handover(rrc, ue, NULL, target_du, &ue->ho_context->target->ue_ho_prep_info, ack, success, NULL, failure);
+  nr_initiate_handover(rrc, ue, NULL, target_du, &ue->ho_context->target->ue_ho_prep_info, ack, success, NULL, failure, false);
   FREE_AND_ZERO_BYTE_ARRAY(ue->ho_context->target->ue_ho_prep_info);
 
   NR_UE_NR_Capability_t *ue_cap = get_ue_nr_capability(ue->rnti, ue->ue_cap_buffer.buf, ue->ue_cap_buffer.len);

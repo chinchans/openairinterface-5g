@@ -22,6 +22,7 @@
 #define RRC_GNB_MOBILITY_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "common/utils/ds/byte_array.h"
 #include "nr_rrc_defs.h"
 
@@ -93,7 +94,14 @@ typedef struct nr_handover_context_s {
 typedef enum { HO_CTX_BOTH, HO_CTX_SOURCE, HO_CTX_TARGET } ho_ctx_type_t;
 nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type);
 
-void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
+void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc,
+                            gNB_RRC_UE_t *ue,
+                            nr_rrc_du_container_t *source_du,
+                            nr_rrc_du_container_t *target_du,
+                            bool inter_gnb_du_ltm);
+
+/** Telnet helper: same as F1 HO but sets Inter-gNB DU LTM IEs on UE Context Setup Request (internal struct). */
+void nr_HO_F1_inter_du_ltm_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id);
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue);
 void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_failure_t *msg);
 

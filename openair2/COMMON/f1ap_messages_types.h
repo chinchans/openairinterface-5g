@@ -501,6 +501,58 @@ typedef struct f1ap_drb_to_release_t {
   int id;
 } f1ap_drb_to_release_t;
 
+/* Rel-18 Inter-gNB DU LTM (TS 38.473): internal C models for IEs not present in
+ * the R16 F1AP ASN.1 used by this tree. OTA encoding of these IEs requires
+ * regenerating F1AP from a Rel-18 or later 38.473 ASN.1 drop. */
+typedef enum f1ap_ltm_ref_cfg_choice_e {
+  F1AP_LTM_REF_CFG_NONE = 0,
+  F1AP_LTM_REF_CFG_REQUEST_LOWER_LAYER,
+  F1AP_LTM_REF_CFG_INFORMATION,
+} f1ap_ltm_ref_cfg_choice_t;
+
+typedef struct f1ap_ltm_reference_configuration_s {
+  f1ap_ltm_ref_cfg_choice_t choice;
+  bool request_for_lower_layer; /* requestForLowerLayerConfiguration = true */
+  byte_array_t *reference_configuration_information;          /* wire-encoded */
+} f1ap_ltm_reference_configuration_t;
+
+typedef struct f1ap_ltm_information_setup_s {
+  bool ltm_indicator;
+  f1ap_ltm_reference_configuration_t *reference_configuration;
+  byte_array_t *csi_resource_configuration; /* encoded CSI-ResourceConfiguration */
+} f1ap_ltm_information_setup_t;
+
+typedef struct f1ap_ltm_configuration_id_mapping_item_s {
+  plmn_id_t ltm_cell_plmn;
+  uint64_t ltm_cell_nr_cellid;
+  uint32_t ltm_configuration_id;
+} f1ap_ltm_configuration_id_mapping_item_t;
+
+typedef struct f1ap_early_sync_information_request_s {
+  bool request_for_rach_configuration;
+  int ltm_gnb_du_id_list_len;
+  uint32_t *ltm_gnb_du_ids;
+} f1ap_early_sync_information_request_t;
+
+typedef enum f1ap_complete_cand_config_indicator_e {
+  F1AP_LTM_CAND_CONFIG_IND_NOT_PRESENT = 0,
+  F1AP_LTM_CAND_CONFIG_IND_COMPLETE,
+} f1ap_complete_cand_config_indicator_t;
+
+typedef struct f1ap_ltm_configuration_s {
+  byte_array_t *ssb_information;
+  byte_array_t *reference_configuration_information;
+  f1ap_complete_cand_config_indicator_t complete_candidate_configuration_ind;
+  byte_array_t *ltm_cfra_resource_config;
+  byte_array_t *ltm_cfra_resource_config_sul;
+  byte_array_t *early_ul_sync_configuration;
+  byte_array_t *early_ul_sync_configuration_sul;
+} f1ap_ltm_configuration_t;
+
+typedef struct f1ap_early_sync_information_s {
+  byte_array_t *encoded; /* F1AP EarlySyncInformation, when OTA data available */
+} f1ap_early_sync_information_t;
+
 typedef struct f1ap_ue_context_setup_req_s {
   uint32_t gNB_CU_ue_id;
   uint32_t *gNB_DU_ue_id;
@@ -520,6 +572,12 @@ typedef struct f1ap_ue_context_setup_req_s {
   byte_array_t *rrc_container;
 
   uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
+
+  /* LTM: optional (Rel-18 IEs; see file comment above) */
+  f1ap_ltm_information_setup_t *ltm_information_setup;
+  f1ap_ltm_configuration_id_mapping_item_t *ltm_configuration_id_mapping_list;
+  int ltm_configuration_id_mapping_list_len;
+  f1ap_early_sync_information_request_t *early_sync_information_request;
 } f1ap_ue_context_setup_req_t;
 
 typedef struct f1ap_ue_context_setup_resp_s {
@@ -535,6 +593,14 @@ typedef struct f1ap_ue_context_setup_resp_s {
 
   int srbs_len;
   f1ap_srb_setup_t *srbs;
+
+  /* requestedTargetCellGlobalID (NRCGI) — present in R16 F1AP; used for LTM */
+  plmn_id_t *requested_target_cell_plmn;
+  uint64_t *requested_target_cell_nr_cellid;
+
+  /* LTM: optional (Rel-18 IEs; OTA TBD, see f1ap_ltm types comment) */
+  f1ap_early_sync_information_t *early_sync_information;
+  f1ap_ltm_configuration_t *ltm_configuration;
 } f1ap_ue_context_setup_resp_t;
 
 typedef struct f1ap_ue_context_mod_req_t {
