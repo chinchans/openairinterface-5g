@@ -117,6 +117,44 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
  * \param target_du the DU towards which to handover. Note: currently, the CU
  * is limited to one cell per DU, so DU and cell are equivalent here.
  * \param ho_ctxt contextual data for the type of handover (F1, N2, Xn) */
+static void nr_rrc_fill_ltm_ue_context_setup_req(f1ap_ue_context_setup_req_t *req,
+                                                 const nr_rrc_du_container_t *target_du,
+                                                 byte_array_t *meas_config)
+{
+  f1ap_ltm_information_setup_t *ltm_setup = calloc_or_fail(1, sizeof(*ltm_setup));
+  ltm_setup->setup_indication = 1;
+  req->ltm_information_setup = ltm_setup;
+
+  f1ap_ltm_configuration_id_mapping_list_t *mapping_list = calloc_or_fail(1, sizeof(*mapping_list));
+  mapping_list->len = 1;
+  mapping_list->items = calloc_or_fail(1, sizeof(*mapping_list->items));
+  mapping_list->items[0].ltm_configuration_id = 1;
+
+  f1ap_ltm_configuration_t *ltm_cfg = &mapping_list->items[0].ltm_configuration;
+  f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
+  ref_cfg->request_for_lower_layer_configuration_present = true;
+  ref_cfg->request_for_lower_layer_configuration = true;
+  if (meas_config && meas_config->len > 0) {
+    ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
+    ref_cfg->reference_configuration_information->information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->information));
+    *ref_cfg->reference_configuration_information->information = copy_byte_array(*meas_config);
+  }
+  ltm_cfg->reference_configuration = ref_cfg;
+
+  if (target_du && target_du->mtc) {
+    byte_array_t mtc_ba = {.buf = calloc_or_fail(1, NR_RRC_BUF_SIZE), .len = 0};
+    mtc_ba.len = do_NR_MeasurementTimingConfiguration(target_du->mtc, mtc_ba.buf, NR_RRC_BUF_SIZE);
+    if (mtc_ba.len > 0) {
+      ltm_cfg->csi_resource_configuration = calloc_or_fail(1, sizeof(*ltm_cfg->csi_resource_configuration));
+      ltm_cfg->csi_resource_configuration->configuration = calloc_or_fail(1, sizeof(*ltm_cfg->csi_resource_configuration->configuration));
+      *ltm_cfg->csi_resource_configuration->configuration = copy_byte_array(mtc_ba);
+    }
+    free(mtc_ba.buf);
+  }
+
+  req->ltm_configuration_id_mapping_list = mapping_list;
+}
+
 static void nr_initiate_handover(const gNB_RRC_INST *rrc,
                                  gNB_RRC_UE_t *ue,
                                  const nr_rrc_du_container_t *source_du,
@@ -217,6 +255,8 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
       .cu_to_du_rrc_info.meas_timing_config = meas_timing_config,
       .gnb_du_ue_agg_mbr_ul = ue_agg_mbr,
   };
+  if (ue->ho_context->ltm_handover)
+    nr_rrc_fill_ltm_ue_context_setup_req(&ue_context_setup_req, target_du, meas_config);
   rrc->mac_rrc.ue_context_setup_request(target_du->assoc_id, &ue_context_setup_req);
   free_ue_context_setup_req(&ue_context_setup_req);
 }
@@ -332,7 +372,11 @@ static void nr_rrc_cancel_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   rrc->mac_rrc.ue_context_release_command(target_ctx->du->assoc_id, &cmd);
 }
 
-void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
+static void nr_rrc_trigger_f1_ho_internal(gNB_RRC_INST *rrc,
+                                          gNB_RRC_UE_t *ue,
+                                          nr_rrc_du_container_t *source_du,
+                                          nr_rrc_du_container_t *target_du,
+                                          bool ltm_handover)
 {
   DevAssert(rrc != NULL);
   DevAssert(ue != NULL);
@@ -346,6 +390,7 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
     return;
   }
   ue->ho_context = alloc_ho_ctx(HO_CTX_BOTH);
+  ue->ho_context->ltm_handover = ltm_handover;
 
   // corresponds to a "handover request", 38.300 Sec 9.3.2.3
   // see also 38.413 Sec 9.3.1.29 for information on source-CU to target-CU
@@ -358,6 +403,17 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   ho_cancel_t cancel = nr_rrc_cancel_f1_ho;
   byte_array_t hpi = {.buf = buf, .len = size};
   nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel, NULL);
+}
+
+void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
+{
+  nr_rrc_trigger_f1_ho_internal(rrc, ue, source_du, target_du, false);
+}
+
+void nr_rrc_trigger_f1_ltm_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
+{
+  LOG_A(NR_RRC, "UE %u: triggering Inter-gNB-DU LTM handover UE Context Setup\n", ue->rrc_ue_id);
+  nr_rrc_trigger_f1_ho_internal(rrc, ue, source_du, target_du, true);
 }
 
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue)

@@ -34,6 +34,7 @@
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
+#include "lib/f1ap_ltm_wire_codec.h"
 
 #include "executables/softmodem-common.h"
 
@@ -712,6 +713,35 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     mgc->buf = calloc_or_fail(1, 1024);
     mgc->len = encode_measgap_config(&UE->measgap_config, mgc->buf);
     resp.du_to_cu_rrc_info.meas_gap_config = mgc;
+  }
+
+  /* Inter-gNB-DU LTM handover: process LTM IEs and include response IEs */
+  if (req->ltm_information_setup || req->ltm_configuration_id_mapping_list) {
+    LOG_I(NR_MAC, "UE %u: processing LTM UE Context Setup Request (LTMInformationSetup=%s, LTMConfigurationIDMappingList=%s)\n",
+          req->gNB_CU_ue_id,
+          req->ltm_information_setup ? "present" : "absent",
+          req->ltm_configuration_id_mapping_list ? "present" : "absent");
+
+    if (req->ltm_configuration_id_mapping_list && req->ltm_configuration_id_mapping_list->len > 0) {
+      const f1ap_ltm_configuration_id_mapping_item_t *item = &req->ltm_configuration_id_mapping_list->items[0];
+      f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
+      if (item->ltm_configuration.reference_configuration) {
+        ltm_cfg->reference_configuration =
+            cp_f1ap_ltm_reference_configuration(item->ltm_configuration.reference_configuration);
+      }
+      if (item->ltm_configuration.csi_resource_configuration) {
+        ltm_cfg->csi_resource_configuration =
+            cp_f1ap_ltm_csi_resource_configuration(item->ltm_configuration.csi_resource_configuration);
+      }
+      resp.ltm_configuration = ltm_cfg;
+    }
+
+    f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
+    early_ul->configuration = calloc_or_fail(1, sizeof(*early_ul->configuration));
+    early_ul->configuration->buf = calloc_or_fail(1, 8);
+    early_ul->configuration->buf[0] = 0x01;
+    early_ul->configuration->len = 1;
+    resp.early_ul_sync_configuration = early_ul;
   }
 
   NR_SCHED_UNLOCK(&mac->sched_lock);

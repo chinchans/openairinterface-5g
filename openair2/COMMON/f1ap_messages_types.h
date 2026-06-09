@@ -501,6 +501,46 @@ typedef struct f1ap_drb_to_release_t {
   int id;
 } f1ap_drb_to_release_t;
 
+/* Rel-18 LTM IEs (internal representation; ASN.1 codegen gap - see f1ap_ltm_wire_codec) */
+#define F1AP_MAX_LTM_CONFIG_ID_MAPPING_LIST 8
+
+typedef struct f1ap_reference_configuration_information_s {
+  byte_array_t *information;
+} f1ap_reference_configuration_information_t;
+
+typedef struct f1ap_reference_configuration_s {
+  bool request_for_lower_layer_configuration_present;
+  bool request_for_lower_layer_configuration;
+  f1ap_reference_configuration_information_t *reference_configuration_information;
+} f1ap_reference_configuration_t;
+
+typedef struct f1ap_csi_resource_configuration_s {
+  byte_array_t *configuration;
+} f1ap_csi_resource_configuration_t;
+
+typedef struct f1ap_ltm_configuration_s {
+  f1ap_reference_configuration_t *reference_configuration;
+  f1ap_csi_resource_configuration_t *csi_resource_configuration;
+} f1ap_ltm_configuration_t;
+
+typedef struct f1ap_ltm_configuration_id_mapping_item_s {
+  uint16_t ltm_configuration_id;
+  f1ap_ltm_configuration_t ltm_configuration;
+} f1ap_ltm_configuration_id_mapping_item_t;
+
+typedef struct f1ap_ltm_configuration_id_mapping_list_s {
+  int len;
+  f1ap_ltm_configuration_id_mapping_item_t *items;
+} f1ap_ltm_configuration_id_mapping_list_t;
+
+typedef struct f1ap_ltm_information_setup_s {
+  uint8_t setup_indication;
+} f1ap_ltm_information_setup_t;
+
+typedef struct f1ap_early_ul_sync_configuration_s {
+  byte_array_t *configuration;
+} f1ap_early_ul_sync_configuration_t;
+
 typedef struct f1ap_ue_context_setup_req_s {
   uint32_t gNB_CU_ue_id;
   uint32_t *gNB_DU_ue_id;
@@ -520,6 +560,10 @@ typedef struct f1ap_ue_context_setup_req_s {
   byte_array_t *rrc_container;
 
   uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
+
+  /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.1) */
+  f1ap_ltm_information_setup_t *ltm_information_setup;
+  f1ap_ltm_configuration_id_mapping_list_t *ltm_configuration_id_mapping_list;
 } f1ap_ue_context_setup_req_t;
 
 typedef struct f1ap_ue_context_setup_resp_s {
@@ -535,6 +579,10 @@ typedef struct f1ap_ue_context_setup_resp_s {
 
   int srbs_len;
   f1ap_srb_setup_t *srbs;
+
+  /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.2) */
+  f1ap_ltm_configuration_t *ltm_configuration;
+  f1ap_early_ul_sync_configuration_t *early_ul_sync_configuration;
 } f1ap_ue_context_setup_resp_t;
 
 typedef struct f1ap_ue_context_mod_req_t {

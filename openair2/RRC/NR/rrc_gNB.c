@@ -2319,6 +2319,12 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     // handling of "target CU" information
     DevAssert(UE->ho_context->target != NULL);
     DevAssert(resp->crnti != NULL);
+    if (UE->ho_context->ltm_handover) {
+      if (resp->ltm_configuration)
+        LOG_I(NR_RRC, "UE %u: LTM UE Context Setup acknowledged by candidate gNB-DU\n", UE->rrc_ue_id);
+      if (resp->early_ul_sync_configuration)
+        LOG_I(NR_RRC, "UE %u: received EarlyULSyncConfiguration from candidate gNB-DU\n", UE->rrc_ue_id);
+    }
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;
     UE->ho_context->target->ho_req_ack(rrc, UE);
