@@ -32,6 +32,7 @@
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "openair2/F1AP/lib/f1ap_ue_context.h"
+#include "openair2/F1AP/lib/f1ap_ltm_wire_codec.h"
 #include "MESSAGES/asn1_msg.h"
 #include "nr_pdcp/nr_pdcp_oai_api.h"
 #include "openair3/SECU/key_nas_deriver.h"
@@ -57,8 +58,11 @@ nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type)
 static void free_ho_ctx(nr_handover_context_t *ho_ctx)
 {
   free(ho_ctx->source);
-  if (ho_ctx->target)
+  if (ho_ctx->target) {
     FREE_AND_ZERO_BYTE_ARRAY(ho_ctx->target->ue_ho_prep_info);
+    f1ap_ltm_free_ltm_configuration(ho_ctx->target->ltm_configuration);
+    f1ap_ltm_free_early_ul_sync_configuration(ho_ctx->target->early_ul_sync_configuration);
+  }
   free(ho_ctx->target);
   free(ho_ctx);
 }
@@ -446,6 +450,30 @@ void nr_HO_F1_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id)
   }
 
   nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+}
+
+void nr_HO_F1_LTM_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id)
+{
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, rrc_ue_id);
+  if (ue_context_p == NULL) {
+    LOG_E(NR_RRC, "cannot find UE context for UE ID %d\n", rrc_ue_id);
+    return;
+  }
+  gNB_RRC_UE_t *ue = &ue_context_p->ue_context;
+  nr_rrc_du_container_t *source_du = get_du_for_ue(rrc, ue->rrc_ue_id);
+  if (source_du == NULL) {
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(rrc_ue_id);
+    LOG_E(NR_RRC, "cannot get source gNB-DU with assoc_id %d for UE %u\n", ue_data.du_assoc_id, ue->rrc_ue_id);
+    return;
+  }
+
+  nr_rrc_du_container_t *target_du = find_target_du(rrc, source_du->assoc_id);
+  if (target_du == NULL) {
+    LOG_E(NR_RRC, "No target gNB-DU found. LTM handover for UE %u aborted.\n", ue->rrc_ue_id);
+    return;
+  }
+
+  nr_rrc_trigger_f1_ltm_ho(rrc, ue, source_du, target_du);
 }
 
 /** @brief Generate the HandoverPreparationInformation to be carried

@@ -43,6 +43,7 @@
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
+#include "lib/f1ap_ltm_wire_codec.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
@@ -981,6 +982,93 @@ static void test_f1ap_ue_context_setup_response_simple()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_ue_context_setup_request_ltm(void)
+{
+  plmn_id_t plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2};
+  f1ap_ue_context_setup_req_t orig = {
+      .gNB_CU_ue_id = 42,
+      .plmn = plmn,
+      .nr_cellid = 123456789,
+      .servCellIndex = 0,
+      .cu_to_du_rrc_info = {.ho_prep_info = get_malloced_test_ba("LTM HO PREP INFO")},
+  };
+
+  f1ap_ltm_information_setup_t *ltm_setup = calloc_or_fail(1, sizeof(*ltm_setup));
+  ltm_setup->setup_indication = 1;
+  orig.ltm_information_setup = ltm_setup;
+
+  f1ap_ltm_configuration_id_mapping_list_t *mapping_list = calloc_or_fail(1, sizeof(*mapping_list));
+  mapping_list->len = 1;
+  mapping_list->items = calloc_or_fail(1, sizeof(*mapping_list->items));
+  mapping_list->items[0].ltm_configuration_id = 7;
+
+  f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
+  ref_cfg->request_for_lower_layer_configuration_present = true;
+  ref_cfg->request_for_lower_layer_configuration = true;
+  ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
+  ref_cfg->reference_configuration_information->information = get_malloced_test_ba("LTM REF CFG");
+  mapping_list->items[0].ltm_configuration.reference_configuration = ref_cfg;
+
+  f1ap_csi_resource_configuration_t *csi_cfg = calloc_or_fail(1, sizeof(*csi_cfg));
+  csi_cfg->configuration = get_malloced_test_ba("LTM CSI CFG");
+  mapping_list->items[0].ltm_configuration.csi_resource_configuration = csi_cfg;
+  orig.ltm_configuration_id_mapping_list = mapping_list;
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+
+  f1ap_ue_context_setup_req_t decoded = {0};
+  bool ret = decode_ue_context_setup_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_req(): could not decode LTM message\n");
+  ret = eq_ue_context_setup_req(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_req(): LTM decoded message doesn't match\n");
+
+  f1ap_msg_free(f1enc);
+  f1ap_msg_free(f1dec);
+  free_ue_context_setup_req(&decoded);
+  free_ue_context_setup_req(&orig);
+
+  printf("%s() successful\n", __func__);
+}
+
+static void test_f1ap_ue_context_setup_response_ltm(void)
+{
+  f1ap_ue_context_setup_resp_t orig = {
+      .gNB_CU_ue_id = 42,
+      .gNB_DU_ue_id = 0x1234,
+      .du_to_cu_rrc_info = {.cell_group_config = get_test_ba("LTM CELL GROUP CONFIG")},
+  };
+
+  f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
+  f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
+  ref_cfg->request_for_lower_layer_configuration_present = true;
+  ref_cfg->request_for_lower_layer_configuration = false;
+  ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
+  ref_cfg->reference_configuration_information->information = get_malloced_test_ba("LTM RESP REF CFG");
+  ltm_cfg->reference_configuration = ref_cfg;
+  orig.ltm_configuration = ltm_cfg;
+
+  f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
+  early_ul->configuration = get_malloced_test_ba("EARLY UL SYNC");
+  orig.early_ul_sync_configuration = early_ul;
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_resp(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+
+  f1ap_ue_context_setup_resp_t decoded = {0};
+  bool ret = decode_ue_context_setup_resp(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_resp(): could not decode LTM message\n");
+  ret = eq_ue_context_setup_resp(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_resp(): LTM decoded message doesn't match\n");
+
+  f1ap_msg_free(f1enc);
+  f1ap_msg_free(f1dec);
+  free_ue_context_setup_resp(&decoded);
+  free_ue_context_setup_resp(&orig);
+
+  printf("%s() successful\n", __func__);
+}
+
 static void test_f1ap_ue_context_modification_request()
 {
   f1ap_ue_context_mod_req_t orig = {
@@ -1285,8 +1373,10 @@ int main()
   test_f1ap_du_configuration_update_acknowledge();
   test_f1ap_ue_context_setup_request();
   test_f1ap_ue_context_setup_request_simple();
+  test_f1ap_ue_context_setup_request_ltm();
   test_f1ap_ue_context_setup_response();
   test_f1ap_ue_context_setup_response_simple();
+  test_f1ap_ue_context_setup_response_ltm();
   test_f1ap_ue_context_modification_request();
   test_f1ap_ue_context_modification_request_simple();
   test_f1ap_ue_context_modification_response();

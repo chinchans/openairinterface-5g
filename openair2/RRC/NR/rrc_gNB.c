@@ -82,6 +82,7 @@
 #include "openair2/F1AP/lib/f1ap_rrc_message_transfer.h"
 #include "openair2/F1AP/lib/f1ap_interface_management.h"
 #include "openair2/F1AP/lib/f1ap_ue_context.h"
+#include "openair2/F1AP/lib/f1ap_ltm_wire_codec.h"
 #include "rrc_gNB_NGAP.h"
 #include "rrc_gNB_du.h"
 #include "rrc_gNB_mobility.h"
@@ -2320,10 +2321,17 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     DevAssert(UE->ho_context->target != NULL);
     DevAssert(resp->crnti != NULL);
     if (UE->ho_context->ltm_handover) {
-      if (resp->ltm_configuration)
+      if (resp->ltm_configuration) {
+        f1ap_ltm_free_ltm_configuration(UE->ho_context->target->ltm_configuration);
+        UE->ho_context->target->ltm_configuration = cp_f1ap_ltm_ltm_configuration(resp->ltm_configuration);
         LOG_I(NR_RRC, "UE %u: LTM UE Context Setup acknowledged by candidate gNB-DU\n", UE->rrc_ue_id);
-      if (resp->early_ul_sync_configuration)
+      }
+      if (resp->early_ul_sync_configuration) {
+        f1ap_ltm_free_early_ul_sync_configuration(UE->ho_context->target->early_ul_sync_configuration);
+        UE->ho_context->target->early_ul_sync_configuration =
+            cp_f1ap_ltm_early_ul_sync_configuration(resp->early_ul_sync_configuration);
         LOG_I(NR_RRC, "UE %u: received EarlyULSyncConfiguration from candidate gNB-DU\n", UE->rrc_ue_id);
+      }
     }
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;

@@ -168,6 +168,7 @@ int fetch_du_by_ue_id(char *buf, int debug, telnet_printfunc_t prnt)
 }
 
 extern void nr_HO_F1_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id);
+extern void nr_HO_F1_LTM_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id);
 /**
  * @brief Trigger F1 handover for UE
  * @param buf: RRC UE ID or NULL for the first UE in list
@@ -194,6 +195,28 @@ int rrc_gNB_trigger_f1_ho(char *buf, int debug, telnet_printfunc_t prnt)
   gNB_RRC_UE_t *UE = &ue->ue_context;
   nr_HO_F1_trigger_telnet(RC.nrrrc[0], UE->rrc_ue_id);
   prnt("RRC F1 handover triggered for UE %u\n", UE->rrc_ue_id);
+  return 0;
+}
+
+int rrc_gNB_trigger_f1_ltm_ho(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  if (!RC.nrrrc)
+    ERROR_MSG_RET("no RRC present, cannot list counts\n");
+  rrc_gNB_ue_context_t *ue = NULL;
+  if (!buf) {
+    ue = get_single_rrc_ue();
+    if (!ue)
+      ERROR_MSG_RET("no single UE in RRC present\n");
+  } else {
+    ue_id_t ue_id = strtol(buf, NULL, 10);
+    ue = rrc_gNB_get_ue_context(RC.nrrrc[0], ue_id);
+    if (!ue)
+      ERROR_MSG_RET("could not find UE with ue_id %d in RRC\n", ue_id);
+  }
+
+  gNB_RRC_UE_t *UE = &ue->ue_context;
+  nr_HO_F1_LTM_trigger_telnet(RC.nrrrc[0], UE->rrc_ue_id);
+  prnt("RRC F1 LTM handover UE Context Setup triggered for UE %u\n", UE->rrc_ue_id);
   return 0;
 }
 
@@ -291,6 +314,7 @@ static telnetshell_cmddef_t cicmds[] = {
     {"force_ue_release", "[rnti(hex,opt)]", force_ue_release},
     {"force_ul_failure", "[rnti(hex,opt)]", force_ul_failure},
     {"trigger_f1_ho", "[rrc_ue_id(int,opt)]", rrc_gNB_trigger_f1_ho},
+    {"trigger_f1_ltm_ho", "[rrc_ue_id(int,opt)]", rrc_gNB_trigger_f1_ltm_ho},
     {"fetch_du_by_ue_id", "[rrc_ue_id(int,opt)]", fetch_du_by_ue_id},
     {"get_current_bwp", "[rnti(hex,opt)]", get_current_bwp},
     {"trigger_n2_ho", "[neighbour_pci(uint32_t),ueId(uint32_t)]", rrc_gNB_trigger_n2_ho},

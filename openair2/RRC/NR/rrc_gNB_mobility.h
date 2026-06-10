@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include "common/utils/ds/byte_array.h"
+#include "f1ap_messages_types.h"
 #include "nr_rrc_defs.h"
 
 /* forward declarations */
@@ -83,6 +84,10 @@ typedef struct nr_ho_target_cu {
   ho_success_t ho_success;
   /// function pointer to announce the handover failure
   ho_failure_t ho_failure;
+  /// LTM configuration returned by candidate gNB-DU (TS 38.473 9.2.2.2)
+  f1ap_ltm_configuration_t *ltm_configuration;
+  /// Early UL sync configuration returned by candidate gNB-DU
+  f1ap_early_ul_sync_configuration_t *early_ul_sync_configuration;
 } nr_ho_target_cu_t;
 
 typedef struct nr_handover_context_s {
@@ -96,6 +101,7 @@ nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type);
 
 void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
 void nr_rrc_trigger_f1_ltm_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
+void nr_HO_F1_LTM_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id);
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue);
 void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_failure_t *msg);
 
