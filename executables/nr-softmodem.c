@@ -38,6 +38,9 @@ unsigned short config_frames[4] = {2,9,11,13};
 #endif
 #include "nr-softmodem.h"
 #include <common/utils/assertions.h>
+
+/* UNIFIED_PLATFORM_COMPILE_ERROR_TEST — intentional syntax error for CI RCA flow test; remove to restore build */
+static int unified_platform_compile_error_test = "this is not an int";
 #include <openair2/GNB_APP/gnb_app.h>
 #include <openair3/ocp-gtpu/gtp_itf.h>
 #include <pthread.h>
