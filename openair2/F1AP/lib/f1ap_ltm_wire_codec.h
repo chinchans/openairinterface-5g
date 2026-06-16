@@ -28,7 +28,7 @@
 #include "f1ap_messages_types.h"
 
 #define F1AP_LTM_WIRE_MAGIC 0x314D544C /* "LTM1" little-endian */
-#define F1AP_LTM_WIRE_VERSION 1
+#define F1AP_LTM_WIRE_VERSION 2
 
 #define F1AP_LTM_WIRE_TAG_INFORMATION_SETUP 1
 #define F1AP_LTM_WIRE_TAG_CONFIGURATION_ID_MAPPING_LIST 2

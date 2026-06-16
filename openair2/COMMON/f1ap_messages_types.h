@@ -524,7 +524,8 @@ typedef struct f1ap_ltm_configuration_s {
 } f1ap_ltm_configuration_t;
 
 typedef struct f1ap_ltm_configuration_id_mapping_item_s {
-  uint16_t ltm_configuration_id;
+  uint8_t ltm_configuration_id; /* TS 38.473: INTEGER (0..255) */
+  uint64_t *candidate_cell_id; /* TS 38.473: NRCellIdentity OPTIONAL (36-bit) */
   f1ap_ltm_configuration_t ltm_configuration;
 } f1ap_ltm_configuration_id_mapping_item_t;
 
