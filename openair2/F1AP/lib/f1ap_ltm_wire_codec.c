@@ -91,13 +91,6 @@ static bool ltm_wire_write_u32(ltm_wire_writer_t *w, uint32_t v)
   return true;
 }
 
-static bool ltm_wire_write_u64(ltm_wire_writer_t *w, uint64_t v)
-{
-  if (!ltm_wire_write_u32(w, (uint32_t)(v & 0xffffffff)))
-    return false;
-  return ltm_wire_write_u32(w, (uint32_t)(v >> 32));
-}
-
 static bool ltm_wire_write_bytes(ltm_wire_writer_t *w, const uint8_t *data, uint32_t len)
 {
   if (!ltm_wire_write_u32(w, len))
@@ -135,16 +128,6 @@ static bool ltm_wire_read_u32(ltm_wire_reader_t *r, uint32_t *v)
   *v = (uint32_t)r->buf[r->pos] | ((uint32_t)r->buf[r->pos + 1] << 8) | ((uint32_t)r->buf[r->pos + 2] << 16)
        | ((uint32_t)r->buf[r->pos + 3] << 24);
   r->pos += 4;
-  return true;
-}
-
-static bool ltm_wire_read_u64(ltm_wire_reader_t *r, uint64_t *v)
-{
-  uint32_t lo = 0;
-  uint32_t hi = 0;
-  if (!ltm_wire_read_u32(r, &lo) || !ltm_wire_read_u32(r, &hi))
-    return false;
-  *v = ((uint64_t)hi << 32) | lo;
   return true;
 }
 
@@ -336,14 +319,10 @@ static bool ltm_wire_encode_configuration_id_mapping_list(ltm_wire_writer_t *w,
     return false;
   for (int i = 0; i < list->len; ++i) {
     const f1ap_ltm_configuration_id_mapping_item_t *item = &list->items[i];
-    if (!ltm_wire_write_u8(w, item->ltm_configuration_id))
+    if (item->ltm_configuration_id > 4095)
       return false;
-    if (!ltm_wire_write_u8(w, item->candidate_cell_id ? 1 : 0))
+    if (!ltm_wire_write_u16(w, item->ltm_configuration_id))
       return false;
-    if (item->candidate_cell_id) {
-      if (!ltm_wire_write_u64(w, *item->candidate_cell_id))
-        return false;
-    }
     if (!ltm_wire_encode_ltm_configuration(w, &item->ltm_configuration))
       return false;
   }
@@ -366,18 +345,8 @@ static bool ltm_wire_decode_configuration_id_mapping_list(ltm_wire_reader_t *r,
   (*out)->len = count;
   (*out)->items = calloc_or_fail(count, sizeof(*(*out)->items));
   for (int i = 0; i < count; ++i) {
-    if (!ltm_wire_read_u8(r, &(*out)->items[i].ltm_configuration_id))
+    if (!ltm_wire_read_u16(r, &(*out)->items[i].ltm_configuration_id))
       return false;
-    uint8_t candidate_present = 0;
-    if (!ltm_wire_read_u8(r, &candidate_present))
-      return false;
-    if (candidate_present) {
-      uint64_t cell_id = 0;
-      if (!ltm_wire_read_u64(r, &cell_id))
-        return false;
-      (*out)->items[i].candidate_cell_id = malloc_or_fail(sizeof(*(*out)->items[i].candidate_cell_id));
-      *(*out)->items[i].candidate_cell_id = cell_id;
-    }
     f1ap_ltm_configuration_t *lc = NULL;
     if (!ltm_wire_decode_ltm_configuration(r, &lc))
       return false;
@@ -776,8 +745,6 @@ void f1ap_ltm_free_configuration_id_mapping_list(f1ap_ltm_configuration_id_mappi
     lc->reference_configuration = NULL;
     f1ap_ltm_free_csi_resource_configuration(lc->csi_resource_configuration);
     lc->csi_resource_configuration = NULL;
-    free(list->items[i].candidate_cell_id);
-    list->items[i].candidate_cell_id = NULL;
   }
   free(list->items);
   free(list);
@@ -793,8 +760,6 @@ f1ap_ltm_configuration_id_mapping_list_t *cp_f1ap_ltm_configuration_id_mapping_l
   cp->items = calloc_or_fail(orig->len, sizeof(*cp->items));
   for (int i = 0; i < orig->len; ++i) {
     cp->items[i].ltm_configuration_id = orig->items[i].ltm_configuration_id;
-    if (orig->items[i].candidate_cell_id)
-      _F1_MALLOC(cp->items[i].candidate_cell_id, *orig->items[i].candidate_cell_id);
     f1ap_ltm_configuration_t *lc = cp_f1ap_ltm_ltm_configuration(&orig->items[i].ltm_configuration);
     if (lc) {
       cp->items[i].ltm_configuration = *lc;
@@ -814,7 +779,6 @@ bool eq_f1ap_ltm_configuration_id_mapping_list(const f1ap_ltm_configuration_id_m
   for (int i = 0; i < a->len; ++i) {
     if (a->items[i].ltm_configuration_id != b->items[i].ltm_configuration_id)
       return false;
-    _F1_EQ_CHECK_OPTIONAL_IE(&a->items[i], &b->items[i], candidate_cell_id, _F1_EQ_CHECK_LONG);
     if (!eq_f1ap_ltm_ltm_configuration(&a->items[i].ltm_configuration, &b->items[i].ltm_configuration))
       return false;
   }

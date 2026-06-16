@@ -133,10 +133,6 @@ static void nr_rrc_fill_ltm_ue_context_setup_req(f1ap_ue_context_setup_req_t *re
   mapping_list->len = 1;
   mapping_list->items = calloc_or_fail(1, sizeof(*mapping_list->items));
   mapping_list->items[0].ltm_configuration_id = 1;
-  if (target_du) {
-    mapping_list->items[0].candidate_cell_id = malloc_or_fail(sizeof(*mapping_list->items[0].candidate_cell_id));
-    *mapping_list->items[0].candidate_cell_id = target_du->setup_req->cell[0].info.nr_cellid;
-  }
 
   f1ap_ltm_configuration_t *ltm_cfg = &mapping_list->items[0].ltm_configuration;
   f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));

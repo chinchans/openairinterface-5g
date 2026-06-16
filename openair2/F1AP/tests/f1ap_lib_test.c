@@ -1001,8 +1001,6 @@ static void test_f1ap_ue_context_setup_request_ltm(void)
   mapping_list->len = 1;
   mapping_list->items = calloc_or_fail(1, sizeof(*mapping_list->items));
   mapping_list->items[0].ltm_configuration_id = 7;
-  mapping_list->items[0].candidate_cell_id = malloc_or_fail(sizeof(*mapping_list->items[0].candidate_cell_id));
-  *mapping_list->items[0].candidate_cell_id = 0x123456789ULL;
 
   f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
   ref_cfg->request_for_lower_layer_configuration_present = true;

@@ -724,13 +724,6 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 
     if (req->ltm_configuration_id_mapping_list && req->ltm_configuration_id_mapping_list->len > 0) {
       const f1ap_ltm_configuration_id_mapping_item_t *item = &req->ltm_configuration_id_mapping_list->items[0];
-      if (item->candidate_cell_id) {
-        LOG_I(NR_MAC,
-              "UE %u: LTM candidate cell NRCellIdentity 0x%lx (config ID %u)\n",
-              req->gNB_CU_ue_id,
-              (unsigned long)*item->candidate_cell_id,
-              item->ltm_configuration_id);
-      }
       f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
       if (item->ltm_configuration.reference_configuration) {
         ltm_cfg->reference_configuration =
