@@ -35,6 +35,8 @@
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
 #include "lib/f1ap_ltm_wire_codec.h"
+#include "MESSAGES/asn1_msg.h"
+#include "openair2/RRC/NR/nr_rrc_common.h"
 
 #include "executables/softmodem-common.h"
 
@@ -731,11 +733,44 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
               (unsigned long)*item->candidate_cell_id,
               item->ltm_configuration_id);
       }
+
       f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
-      if (item->ltm_configuration.reference_configuration) {
+      const bool request_lower_layer =
+          item->ltm_configuration.reference_configuration
+          && item->ltm_configuration.reference_configuration->request_for_lower_layer_configuration_present
+          && item->ltm_configuration.reference_configuration->request_for_lower_layer_configuration;
+
+      if (request_lower_layer) {
+        f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
+        ref_cfg->request_for_lower_layer_configuration_present = true;
+        ref_cfg->request_for_lower_layer_configuration = false;
+        ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
+
+        ref_cfg->reference_configuration_information->cellGroupConfig =
+            calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->cellGroupConfig));
+        *ref_cfg->reference_configuration_information->cellGroupConfig = copy_byte_array(cgc);
+
+        if (cu2du->meas_timing_config && cu2du->meas_timing_config->len > 0) {
+          ref_cfg->reference_configuration_information->measurementTimingConfiguration =
+              calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->measurementTimingConfiguration));
+          *ref_cfg->reference_configuration_information->measurementTimingConfiguration =
+              copy_byte_array(*cu2du->meas_timing_config);
+        } else if (mtc) {
+          byte_array_t mtc_ba = {.buf = calloc_or_fail(1, NR_RRC_BUF_SIZE), .len = 0};
+          mtc_ba.len = do_NR_MeasurementTimingConfiguration(mtc, mtc_ba.buf, NR_RRC_BUF_SIZE);
+          if (mtc_ba.len > 0) {
+            ref_cfg->reference_configuration_information->measurementTimingConfiguration =
+                calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->measurementTimingConfiguration));
+            *ref_cfg->reference_configuration_information->measurementTimingConfiguration = copy_byte_array(mtc_ba);
+          }
+          free(mtc_ba.buf);
+        }
+        ltm_cfg->reference_configuration = ref_cfg;
+      } else if (item->ltm_configuration.reference_configuration) {
         ltm_cfg->reference_configuration =
             cp_f1ap_ltm_reference_configuration(item->ltm_configuration.reference_configuration);
       }
+
       if (item->ltm_configuration.csi_resource_configuration) {
         ltm_cfg->csi_resource_configuration =
             cp_f1ap_ltm_csi_resource_configuration(item->ltm_configuration.csi_resource_configuration);
@@ -744,10 +779,15 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     }
 
     f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
-    early_ul->configuration = calloc_or_fail(1, sizeof(*early_ul->configuration));
-    early_ul->configuration->buf = calloc_or_fail(1, 8);
-    early_ul->configuration->buf[0] = 0x01;
-    early_ul->configuration->len = 1;
+    early_ul->prachConfigurationIndex = 0;
+    early_ul->prachFrequencyOffset = 0;
+    if (scc && scc->uplinkConfigCommon && scc->uplinkConfigCommon->initialUplinkBWP
+        && scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon) {
+      NR_RACH_ConfigGeneric_t *rach =
+          &scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric;
+      early_ul->prachConfigurationIndex = rach->prach_ConfigurationIndex;
+      early_ul->prachFrequencyOffset = rach->msg1_FrequencyStart;
+    }
     resp.early_ul_sync_configuration = early_ul;
   }
 

@@ -123,7 +123,9 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
  * \param ho_ctxt contextual data for the type of handover (F1, N2, Xn) */
 static void nr_rrc_fill_ltm_ue_context_setup_req(f1ap_ue_context_setup_req_t *req,
                                                  const nr_rrc_du_container_t *target_du,
-                                                 byte_array_t *meas_config)
+                                                 byte_array_t *meas_config,
+                                                 byte_array_t *meas_timing_config,
+                                                 byte_array_t *source_cell_group_config)
 {
   f1ap_ltm_information_setup_t *ltm_setup = calloc_or_fail(1, sizeof(*ltm_setup));
   ltm_setup->setup_indication = 1;
@@ -142,23 +144,23 @@ static void nr_rrc_fill_ltm_ue_context_setup_req(f1ap_ue_context_setup_req_t *re
   f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
   ref_cfg->request_for_lower_layer_configuration_present = true;
   ref_cfg->request_for_lower_layer_configuration = true;
-  if (meas_config && meas_config->len > 0) {
-    ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
-    ref_cfg->reference_configuration_information->information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->information));
-    *ref_cfg->reference_configuration_information->information = copy_byte_array(*meas_config);
+  ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
+  if (source_cell_group_config && source_cell_group_config->len > 0) {
+    ref_cfg->reference_configuration_information->cellGroupConfig =
+        calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->cellGroupConfig));
+    *ref_cfg->reference_configuration_information->cellGroupConfig = copy_byte_array(*source_cell_group_config);
+  }
+  if (meas_timing_config && meas_timing_config->len > 0) {
+    ref_cfg->reference_configuration_information->measurementTimingConfiguration =
+        calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->measurementTimingConfiguration));
+    *ref_cfg->reference_configuration_information->measurementTimingConfiguration = copy_byte_array(*meas_timing_config);
+  } else if (meas_config && meas_config->len > 0) {
+    /* fallback: carry MeasConfig octets when MTC not available */
+    ref_cfg->reference_configuration_information->measurementTimingConfiguration =
+        calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information->measurementTimingConfiguration));
+    *ref_cfg->reference_configuration_information->measurementTimingConfiguration = copy_byte_array(*meas_config);
   }
   ltm_cfg->reference_configuration = ref_cfg;
-
-  if (target_du && target_du->mtc) {
-    byte_array_t mtc_ba = {.buf = calloc_or_fail(1, NR_RRC_BUF_SIZE), .len = 0};
-    mtc_ba.len = do_NR_MeasurementTimingConfiguration(target_du->mtc, mtc_ba.buf, NR_RRC_BUF_SIZE);
-    if (mtc_ba.len > 0) {
-      ltm_cfg->csi_resource_configuration = calloc_or_fail(1, sizeof(*ltm_cfg->csi_resource_configuration));
-      ltm_cfg->csi_resource_configuration->configuration = calloc_or_fail(1, sizeof(*ltm_cfg->csi_resource_configuration->configuration));
-      *ltm_cfg->csi_resource_configuration->configuration = copy_byte_array(mtc_ba);
-    }
-    free(mtc_ba.buf);
-  }
 
   req->ltm_configuration_id_mapping_list = mapping_list;
 }
@@ -263,8 +265,22 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
       .cu_to_du_rrc_info.meas_timing_config = meas_timing_config,
       .gnb_du_ue_agg_mbr_ul = ue_agg_mbr,
   };
-  if (ue->ho_context->ltm_handover)
-    nr_rrc_fill_ltm_ue_context_setup_req(&ue_context_setup_req, target_du, meas_config);
+  if (ue->ho_context->ltm_handover) {
+    byte_array_t source_cgc = {.buf = NULL, .len = 0};
+    if (ue->masterCellGroup) {
+      source_cgc.buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
+      asn_enc_rval_t enc_rval =
+          uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, ue->masterCellGroup, source_cgc.buf, NR_RRC_BUF_SIZE);
+      if (enc_rval.encoded > 0)
+        source_cgc.len = (enc_rval.encoded + 7) >> 3;
+    }
+    nr_rrc_fill_ltm_ue_context_setup_req(&ue_context_setup_req,
+                                         target_du,
+                                         meas_config,
+                                         meas_timing_config,
+                                         source_cgc.len > 0 ? &source_cgc : NULL);
+    free(source_cgc.buf);
+  }
   rrc->mac_rrc.ue_context_setup_request(target_du->assoc_id, &ue_context_setup_req);
   free_ue_context_setup_req(&ue_context_setup_req);
 }

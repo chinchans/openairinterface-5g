@@ -186,15 +186,44 @@ static bool ltm_wire_read_ba_ptr(ltm_wire_reader_t *r, byte_array_t **out)
 }
 
 static bool ltm_wire_encode_reference_configuration_information(ltm_wire_writer_t *w,
-                                                                const f1ap_reference_configuration_information_t *rci)
+                                                                  const f1ap_reference_configuration_information_t *rci)
 {
-  return ltm_wire_write_ba(w, rci ? rci->information : NULL);
+  if (!rci) {
+    if (!ltm_wire_write_u8(w, 0))
+      return false;
+    if (!ltm_wire_write_u8(w, 0))
+      return false;
+    return true;
+  }
+  if (!ltm_wire_write_u8(w, rci->cellGroupConfig ? 1 : 0))
+    return false;
+  if (rci->cellGroupConfig && !ltm_wire_write_ba(w, rci->cellGroupConfig))
+    return false;
+  if (!ltm_wire_write_u8(w, rci->measurementTimingConfiguration ? 1 : 0))
+    return false;
+  if (rci->measurementTimingConfiguration && !ltm_wire_write_ba(w, rci->measurementTimingConfiguration))
+    return false;
+  return true;
 }
 
 static bool ltm_wire_decode_reference_configuration_information(ltm_wire_reader_t *r,
-                                                                f1ap_reference_configuration_information_t *rci)
+                                                                  f1ap_reference_configuration_information_t *rci)
 {
-  return ltm_wire_read_ba_ptr(r, &rci->information);
+  uint8_t cgc_present = 0;
+  uint8_t mtc_present = 0;
+  if (!ltm_wire_read_u8(r, &cgc_present))
+    return false;
+  if (cgc_present) {
+    if (!ltm_wire_read_ba_ptr(r, &rci->cellGroupConfig))
+      return false;
+  }
+  if (!ltm_wire_read_u8(r, &mtc_present))
+    return false;
+  if (mtc_present) {
+    if (!ltm_wire_read_ba_ptr(r, &rci->measurementTimingConfiguration))
+      return false;
+  }
+  return true;
 }
 
 static bool ltm_wire_encode_reference_configuration(ltm_wire_writer_t *w, const f1ap_reference_configuration_t *rc)
@@ -417,21 +446,21 @@ static bool ltm_wire_decode_information_setup(ltm_wire_reader_t *r, f1ap_ltm_inf
 static bool ltm_wire_encode_early_ul_sync_configuration(ltm_wire_writer_t *w,
                                                         const f1ap_early_ul_sync_configuration_t *cfg)
 {
-  return ltm_wire_write_ba(w, cfg ? cfg->configuration : NULL);
+  if (!cfg)
+    return false;
+  if (!ltm_wire_write_u8(w, cfg->prachConfigurationIndex))
+    return false;
+  return ltm_wire_write_u16(w, cfg->prachFrequencyOffset);
 }
 
 static bool ltm_wire_decode_early_ul_sync_configuration(ltm_wire_reader_t *r, f1ap_early_ul_sync_configuration_t **out)
 {
-  byte_array_t *ba = NULL;
-  if (!ltm_wire_read_ba_ptr(r, &ba))
+  if (!out)
     return false;
-  if (!ba) {
-    *out = NULL;
-    return true;
-  }
   *out = calloc_or_fail(1, sizeof(**out));
-  (*out)->configuration = ba;
-  return true;
+  if (!ltm_wire_read_u8(r, &(*out)->prachConfigurationIndex))
+    return false;
+  return ltm_wire_read_u16(r, &(*out)->prachFrequencyOffset);
 }
 
 static byte_array_t *ltm_wire_finalize(ltm_wire_writer_t *w, uint16_t num_tags)
@@ -653,22 +682,26 @@ void f1ap_ltm_free_reference_configuration_information(f1ap_reference_configurat
 {
   if (!rci)
     return;
-  FREE_OPT_BYTE_ARRAY(rci->information);
+  FREE_OPT_BYTE_ARRAY(rci->cellGroupConfig);
+  FREE_OPT_BYTE_ARRAY(rci->measurementTimingConfiguration);
 }
 
 f1ap_reference_configuration_information_t cp_f1ap_ltm_reference_configuration_information(
     const f1ap_reference_configuration_information_t *orig)
 {
   f1ap_reference_configuration_information_t cp = {0};
-  if (orig)
-    CP_OPT_BYTE_ARRAY(cp.information, orig->information);
+  if (orig) {
+    CP_OPT_BYTE_ARRAY(cp.cellGroupConfig, orig->cellGroupConfig);
+    CP_OPT_BYTE_ARRAY(cp.measurementTimingConfiguration, orig->measurementTimingConfiguration);
+  }
   return cp;
 }
 
 bool eq_f1ap_ltm_reference_configuration_information(const f1ap_reference_configuration_information_t *a,
                                                      const f1ap_reference_configuration_information_t *b)
 {
-  return ltm_eq_ba_ptr(a ? a->information : NULL, b ? b->information : NULL);
+  return ltm_eq_ba_ptr(a ? a->cellGroupConfig : NULL, b ? b->cellGroupConfig : NULL)
+         && ltm_eq_ba_ptr(a ? a->measurementTimingConfiguration : NULL, b ? b->measurementTimingConfiguration : NULL);
 }
 
 void f1ap_ltm_free_reference_configuration(f1ap_reference_configuration_t *rc)
@@ -846,9 +879,6 @@ bool eq_f1ap_ltm_information_setup(const f1ap_ltm_information_setup_t *a, const 
 
 void f1ap_ltm_free_early_ul_sync_configuration(f1ap_early_ul_sync_configuration_t *cfg)
 {
-  if (!cfg)
-    return;
-  FREE_OPT_BYTE_ARRAY(cfg->configuration);
   free(cfg);
 }
 
@@ -857,14 +887,19 @@ f1ap_early_ul_sync_configuration_t *cp_f1ap_ltm_early_ul_sync_configuration(cons
   if (!orig)
     return NULL;
   f1ap_early_ul_sync_configuration_t *cp = calloc_or_fail(1, sizeof(*cp));
-  CP_OPT_BYTE_ARRAY(cp->configuration, orig->configuration);
+  cp->prachConfigurationIndex = orig->prachConfigurationIndex;
+  cp->prachFrequencyOffset = orig->prachFrequencyOffset;
   return cp;
 }
 
 bool eq_f1ap_ltm_early_ul_sync_configuration(const f1ap_early_ul_sync_configuration_t *a,
                                              const f1ap_early_ul_sync_configuration_t *b)
 {
-  return ltm_eq_ba_ptr(a ? a->configuration : NULL, b ? b->configuration : NULL);
+  if (!a && !b)
+    return true;
+  if (!a || !b)
+    return false;
+  return a->prachConfigurationIndex == b->prachConfigurationIndex && a->prachFrequencyOffset == b->prachFrequencyOffset;
 }
 
 void f1ap_ltm_free_ue_context_setup_req_ltm(f1ap_ue_context_setup_req_t *req)

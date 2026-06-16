@@ -1008,7 +1008,8 @@ static void test_f1ap_ue_context_setup_request_ltm(void)
   ref_cfg->request_for_lower_layer_configuration_present = true;
   ref_cfg->request_for_lower_layer_configuration = true;
   ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
-  ref_cfg->reference_configuration_information->information = get_malloced_test_ba("LTM REF CFG");
+  ref_cfg->reference_configuration_information->cellGroupConfig = get_malloced_test_ba("LTM CELL GROUP CONFIG");
+  ref_cfg->reference_configuration_information->measurementTimingConfiguration = get_malloced_test_ba("LTM MTC");
   mapping_list->items[0].ltm_configuration.reference_configuration = ref_cfg;
 
   f1ap_csi_resource_configuration_t *csi_cfg = calloc_or_fail(1, sizeof(*csi_cfg));
@@ -1046,12 +1047,14 @@ static void test_f1ap_ue_context_setup_response_ltm(void)
   ref_cfg->request_for_lower_layer_configuration_present = true;
   ref_cfg->request_for_lower_layer_configuration = false;
   ref_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ref_cfg->reference_configuration_information));
-  ref_cfg->reference_configuration_information->information = get_malloced_test_ba("LTM RESP REF CFG");
+  ref_cfg->reference_configuration_information->cellGroupConfig = get_malloced_test_ba("LTM RESP CELL GROUP");
+  ref_cfg->reference_configuration_information->measurementTimingConfiguration = get_malloced_test_ba("LTM RESP MTC");
   ltm_cfg->reference_configuration = ref_cfg;
   orig.ltm_configuration = ltm_cfg;
 
   f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
-  early_ul->configuration = get_malloced_test_ba("EARLY UL SYNC");
+  early_ul->prachConfigurationIndex = 12;
+  early_ul->prachFrequencyOffset = 1024;
   orig.early_ul_sync_configuration = early_ul;
 
   F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_resp(&orig);
