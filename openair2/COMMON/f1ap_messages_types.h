@@ -586,6 +586,8 @@ typedef struct f1ap_ue_context_setup_resp_s {
   /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.2) */
   f1ap_ltm_configuration_t *ltm_configuration;
   f1ap_early_ul_sync_configuration_t *early_ul_sync_configuration;
+  /* Present when LTMIndicator is true in UE CONTEXT SETUP REQUEST (TS 38.473 8.3.1.2) */
+  uint64_t *requested_target_cell_id; /* NRCellIdentity (36-bit) */
 } f1ap_ue_context_setup_resp_t;
 
 typedef struct f1ap_ue_context_mod_req_t {

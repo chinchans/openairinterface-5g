@@ -789,6 +789,20 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
       early_ul->prachFrequencyOffset = rach->msg1_FrequencyStart;
     }
     resp.early_ul_sync_configuration = early_ul;
+
+    if (req->ltm_information_setup && req->ltm_information_setup->setup_indication) {
+      uint64_t target_cell_id = req->nr_cellid;
+      if (req->ltm_configuration_id_mapping_list && req->ltm_configuration_id_mapping_list->len > 0
+          && req->ltm_configuration_id_mapping_list->items[0].candidate_cell_id) {
+        target_cell_id = *req->ltm_configuration_id_mapping_list->items[0].candidate_cell_id;
+      }
+      resp.requested_target_cell_id = malloc_or_fail(sizeof(*resp.requested_target_cell_id));
+      *resp.requested_target_cell_id = target_cell_id;
+      LOG_I(NR_MAC,
+            "UE %u: LTM Requested Target Cell ID 0x%lx in UE Context Setup Response\n",
+            req->gNB_CU_ue_id,
+            (unsigned long)target_cell_id);
+    }
   }
 
   NR_SCHED_UNLOCK(&mac->sched_lock);

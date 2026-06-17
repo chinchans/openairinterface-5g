@@ -1057,6 +1057,9 @@ static void test_f1ap_ue_context_setup_response_ltm(void)
   early_ul->prachFrequencyOffset = 1024;
   orig.early_ul_sync_configuration = early_ul;
 
+  orig.requested_target_cell_id = malloc_or_fail(sizeof(*orig.requested_target_cell_id));
+  *orig.requested_target_cell_id = 0xabcdef123ULL;
+
   F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_resp(&orig);
   F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
 

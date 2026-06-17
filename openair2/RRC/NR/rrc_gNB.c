@@ -2332,6 +2332,12 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
             cp_f1ap_ltm_early_ul_sync_configuration(resp->early_ul_sync_configuration);
         LOG_I(NR_RRC, "UE %u: received EarlyULSyncConfiguration from candidate gNB-DU\n", UE->rrc_ue_id);
       }
+      if (resp->requested_target_cell_id) {
+        LOG_I(NR_RRC,
+              "UE %u: candidate gNB-DU accepted LTM target cell NRCellIdentity 0x%lx\n",
+              UE->rrc_ue_id,
+              (unsigned long)*resp->requested_target_cell_id);
+      }
     }
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;

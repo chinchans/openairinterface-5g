@@ -597,7 +597,7 @@ byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_resp_ltm(const f1ap_ue_context_s
 {
   if (!resp)
     return NULL;
-  if (!resp->ltm_configuration && !resp->early_ul_sync_configuration)
+  if (!resp->ltm_configuration && !resp->early_ul_sync_configuration && !resp->requested_target_cell_id)
     return NULL;
 
   ltm_wire_writer_t payload = {0};
@@ -624,6 +624,22 @@ byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_resp_ltm(const f1ap_ue_context_s
       goto fail;
     ltm_wire_writer_t ie = {0};
     if (!ltm_wire_encode_early_ul_sync_configuration(&ie, resp->early_ul_sync_configuration))
+      goto fail_ie;
+    if (!ltm_wire_write_u32(&payload, (uint32_t)ie.pos))
+      goto fail_ie;
+    if (!ltm_wire_writer_ensure(&payload, ie.pos))
+      goto fail_ie;
+    memcpy(payload.buf + payload.pos, ie.buf, ie.pos);
+    payload.pos += ie.pos;
+    free(ie.buf);
+    num_tags++;
+  }
+
+  if (resp->requested_target_cell_id) {
+    if (!ltm_wire_write_u16(&payload, F1AP_LTM_WIRE_TAG_REQUESTED_TARGET_CELL_ID))
+      goto fail;
+    ltm_wire_writer_t ie = {0};
+    if (!ltm_wire_write_u64(&ie, *resp->requested_target_cell_id))
       goto fail_ie;
     if (!ltm_wire_write_u32(&payload, (uint32_t)ie.pos))
       goto fail_ie;
@@ -671,6 +687,13 @@ bool f1ap_ltm_wire_decode_ue_ctx_setup_resp_ltm(const byte_array_t *ba, f1ap_ue_
         if (!ltm_wire_decode_early_ul_sync_configuration(&ie, &resp->early_ul_sync_configuration))
           return false;
         break;
+      case F1AP_LTM_WIRE_TAG_REQUESTED_TARGET_CELL_ID: {
+        uint64_t cell_id = 0;
+        if (!ltm_wire_read_u64(&ie, &cell_id))
+          return false;
+        resp->requested_target_cell_id = malloc_or_fail(sizeof(*resp->requested_target_cell_id));
+        *resp->requested_target_cell_id = cell_id;
+        } break;
       default:
         break;
     }
@@ -920,4 +943,6 @@ void f1ap_ltm_free_ue_context_setup_resp_ltm(f1ap_ue_context_setup_resp_t *resp)
   resp->ltm_configuration = NULL;
   f1ap_ltm_free_early_ul_sync_configuration(resp->early_ul_sync_configuration);
   resp->early_ul_sync_configuration = NULL;
+  free(resp->requested_target_cell_id);
+  resp->requested_target_cell_id = NULL;
 }

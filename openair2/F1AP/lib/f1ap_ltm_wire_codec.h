@@ -34,6 +34,7 @@
 #define F1AP_LTM_WIRE_TAG_CONFIGURATION_ID_MAPPING_LIST 2
 #define F1AP_LTM_WIRE_TAG_LTM_CONFIGURATION 3
 #define F1AP_LTM_WIRE_TAG_EARLY_UL_SYNC_CONFIGURATION 4
+#define F1AP_LTM_WIRE_TAG_REQUESTED_TARGET_CELL_ID 5
 
 bool f1ap_ltm_wire_is_ltm_container(const byte_array_t *ba);
 byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(const f1ap_ue_context_setup_req_t *req);

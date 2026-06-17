@@ -1597,6 +1597,8 @@ f1ap_ue_context_setup_resp_t cp_ue_context_setup_resp(const f1ap_ue_context_setu
     cp.ltm_configuration = cp_f1ap_ltm_ltm_configuration(orig->ltm_configuration);
   if (orig->early_ul_sync_configuration)
     cp.early_ul_sync_configuration = cp_f1ap_ltm_early_ul_sync_configuration(orig->early_ul_sync_configuration);
+  if (orig->requested_target_cell_id)
+    _F1_MALLOC(cp.requested_target_cell_id, *orig->requested_target_cell_id);
   return cp;
 }
 
@@ -1622,6 +1624,7 @@ bool eq_ue_context_setup_resp(const f1ap_ue_context_setup_resp_t *a, const f1ap_
 
   _F1_CHECK_EXP(eq_f1ap_ltm_ltm_configuration(a->ltm_configuration, b->ltm_configuration));
   _F1_CHECK_EXP(eq_f1ap_ltm_early_ul_sync_configuration(a->early_ul_sync_configuration, b->early_ul_sync_configuration));
+  _F1_EQ_CHECK_OPTIONAL_IE(a, b, requested_target_cell_id, _F1_EQ_CHECK_LONG);
   return true;
 }
 
