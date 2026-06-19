@@ -35,6 +35,7 @@
 #define F1AP_LTM_WIRE_TAG_LTM_CONFIGURATION 3
 #define F1AP_LTM_WIRE_TAG_EARLY_UL_SYNC_CONFIGURATION 4
 #define F1AP_LTM_WIRE_TAG_REQUESTED_TARGET_CELL_ID 5
+#define F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST 6
 
 bool f1ap_ltm_wire_is_ltm_container(const byte_array_t *ba);
 byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(const f1ap_ue_context_setup_req_t *req);
@@ -71,6 +72,12 @@ bool eq_f1ap_ltm_configuration_id_mapping_list(const f1ap_ltm_configuration_id_m
 void f1ap_ltm_free_information_setup(f1ap_ltm_information_setup_t *setup);
 f1ap_ltm_information_setup_t *cp_f1ap_ltm_information_setup(const f1ap_ltm_information_setup_t *orig);
 bool eq_f1ap_ltm_information_setup(const f1ap_ltm_information_setup_t *a, const f1ap_ltm_information_setup_t *b);
+
+void f1ap_ltm_free_early_sync_information_request(f1ap_early_sync_information_request_t *req);
+f1ap_early_sync_information_request_t *cp_f1ap_ltm_early_sync_information_request(
+    const f1ap_early_sync_information_request_t *orig);
+bool eq_f1ap_ltm_early_sync_information_request(const f1ap_early_sync_information_request_t *a,
+                                                const f1ap_early_sync_information_request_t *b);
 
 void f1ap_ltm_free_early_ul_sync_configuration(f1ap_early_ul_sync_configuration_t *cfg);
 f1ap_early_ul_sync_configuration_t *cp_f1ap_ltm_early_ul_sync_configuration(const f1ap_early_ul_sync_configuration_t *orig);

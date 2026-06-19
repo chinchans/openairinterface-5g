@@ -418,6 +418,37 @@ static bool ltm_wire_decode_configuration_id_mapping_list(ltm_wire_reader_t *r,
   return true;
 }
 
+static bool ltm_wire_encode_early_sync_information_request(ltm_wire_writer_t *w,
+                                                           const f1ap_early_sync_information_request_t *req)
+{
+  if (!req) {
+    if (!ltm_wire_write_u8(w, 0))
+      return false;
+    return true;
+  }
+  if (!ltm_wire_write_u8(w, 1))
+    return false;
+  return ltm_wire_write_u8(w, req->request_for_rach_configuration ? 1 : 0);
+}
+
+static bool ltm_wire_decode_early_sync_information_request(ltm_wire_reader_t *r,
+                                                             f1ap_early_sync_information_request_t **out)
+{
+  uint8_t present = 0;
+  if (!ltm_wire_read_u8(r, &present))
+    return false;
+  if (!present) {
+    *out = NULL;
+    return true;
+  }
+  *out = calloc_or_fail(1, sizeof(**out));
+  uint8_t val = 0;
+  if (!ltm_wire_read_u8(r, &val))
+    return false;
+  (*out)->request_for_rach_configuration = val != 0;
+  return true;
+}
+
 static bool ltm_wire_encode_information_setup(ltm_wire_writer_t *w, const f1ap_ltm_information_setup_t *setup)
 {
   if (!setup) {
@@ -512,7 +543,7 @@ byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(const f1ap_ue_context_se
 {
   if (!req)
     return NULL;
-  if (!req->ltm_information_setup && !req->ltm_configuration_id_mapping_list)
+  if (!req->ltm_information_setup && !req->ltm_configuration_id_mapping_list && !req->early_sync_information_request)
     return NULL;
 
   ltm_wire_writer_t payload = {0};
@@ -539,6 +570,22 @@ byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(const f1ap_ue_context_se
       goto fail;
     ltm_wire_writer_t ie = {0};
     if (!ltm_wire_encode_configuration_id_mapping_list(&ie, req->ltm_configuration_id_mapping_list))
+      goto fail_ie;
+    if (!ltm_wire_write_u32(&payload, (uint32_t)ie.pos))
+      goto fail_ie;
+    if (!ltm_wire_writer_ensure(&payload, ie.pos))
+      goto fail_ie;
+    memcpy(payload.buf + payload.pos, ie.buf, ie.pos);
+    payload.pos += ie.pos;
+    free(ie.buf);
+    num_tags++;
+  }
+
+  if (req->early_sync_information_request) {
+    if (!ltm_wire_write_u16(&payload, F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST))
+      goto fail;
+    ltm_wire_writer_t ie = {0};
+    if (!ltm_wire_encode_early_sync_information_request(&ie, req->early_sync_information_request))
       goto fail_ie;
     if (!ltm_wire_write_u32(&payload, (uint32_t)ie.pos))
       goto fail_ie;
@@ -584,6 +631,10 @@ bool f1ap_ltm_wire_decode_ue_ctx_setup_req_ltm(const byte_array_t *ba, f1ap_ue_c
         break;
       case F1AP_LTM_WIRE_TAG_CONFIGURATION_ID_MAPPING_LIST:
         if (!ltm_wire_decode_configuration_id_mapping_list(&ie, &req->ltm_configuration_id_mapping_list))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST:
+        if (!ltm_wire_decode_early_sync_information_request(&ie, &req->early_sync_information_request))
           return false;
         break;
       default:
@@ -900,6 +951,31 @@ bool eq_f1ap_ltm_information_setup(const f1ap_ltm_information_setup_t *a, const 
   return a->setup_indication == b->setup_indication;
 }
 
+void f1ap_ltm_free_early_sync_information_request(f1ap_early_sync_information_request_t *req)
+{
+  free(req);
+}
+
+f1ap_early_sync_information_request_t *cp_f1ap_ltm_early_sync_information_request(
+    const f1ap_early_sync_information_request_t *orig)
+{
+  if (!orig)
+    return NULL;
+  f1ap_early_sync_information_request_t *cp = calloc_or_fail(1, sizeof(*cp));
+  *cp = *orig;
+  return cp;
+}
+
+bool eq_f1ap_ltm_early_sync_information_request(const f1ap_early_sync_information_request_t *a,
+                                                const f1ap_early_sync_information_request_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b)
+    return false;
+  return a->request_for_rach_configuration == b->request_for_rach_configuration;
+}
+
 void f1ap_ltm_free_early_ul_sync_configuration(f1ap_early_ul_sync_configuration_t *cfg)
 {
   free(cfg);
@@ -933,6 +1009,8 @@ void f1ap_ltm_free_ue_context_setup_req_ltm(f1ap_ue_context_setup_req_t *req)
   req->ltm_information_setup = NULL;
   f1ap_ltm_free_configuration_id_mapping_list(req->ltm_configuration_id_mapping_list);
   req->ltm_configuration_id_mapping_list = NULL;
+  f1ap_ltm_free_early_sync_information_request(req->early_sync_information_request);
+  req->early_sync_information_request = NULL;
 }
 
 void f1ap_ltm_free_ue_context_setup_resp_ltm(f1ap_ue_context_setup_resp_t *resp)

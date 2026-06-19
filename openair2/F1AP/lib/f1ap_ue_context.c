@@ -1366,6 +1366,8 @@ f1ap_ue_context_setup_req_t cp_ue_context_setup_req(const f1ap_ue_context_setup_
     cp.ltm_information_setup = cp_f1ap_ltm_information_setup(orig->ltm_information_setup);
   if (orig->ltm_configuration_id_mapping_list)
     cp.ltm_configuration_id_mapping_list = cp_f1ap_ltm_configuration_id_mapping_list(orig->ltm_configuration_id_mapping_list);
+  if (orig->early_sync_information_request)
+    cp.early_sync_information_request = cp_f1ap_ltm_early_sync_information_request(orig->early_sync_information_request);
   return cp;
 }
 
@@ -1402,6 +1404,12 @@ bool eq_ue_context_setup_req(const f1ap_ue_context_setup_req_t *a, const f1ap_ue
     return false;
   _F1_CHECK_EXP(eq_f1ap_ltm_configuration_id_mapping_list(a->ltm_configuration_id_mapping_list,
                                                           b->ltm_configuration_id_mapping_list));
+  if (!!a->early_sync_information_request != !!b->early_sync_information_request)
+    return false;
+  if (a->early_sync_information_request
+      && !eq_f1ap_ltm_early_sync_information_request(a->early_sync_information_request,
+                                                     b->early_sync_information_request))
+    return false;
   return true;
 }
 

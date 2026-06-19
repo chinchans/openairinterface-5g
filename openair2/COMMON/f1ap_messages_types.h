@@ -536,8 +536,12 @@ typedef struct f1ap_ltm_configuration_id_mapping_list_s {
 } f1ap_ltm_configuration_id_mapping_list_t;
 
 typedef struct f1ap_ltm_information_setup_s {
-  uint8_t setup_indication;
+  uint8_t setup_indication; /* LTM Indicator (TS 38.473 9.3.1.291) */
 } f1ap_ltm_information_setup_t;
+
+typedef struct f1ap_early_sync_information_request_s {
+  bool request_for_rach_configuration; /* RequestforRACHConfiguration (TS 38.473 9.3.1.326) */
+} f1ap_early_sync_information_request_t;
 
 typedef struct f1ap_early_ul_sync_configuration_s {
   uint8_t prachConfigurationIndex; /* INTEGER (0..63) */
@@ -567,6 +571,7 @@ typedef struct f1ap_ue_context_setup_req_s {
   /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.1) */
   f1ap_ltm_information_setup_t *ltm_information_setup;
   f1ap_ltm_configuration_id_mapping_list_t *ltm_configuration_id_mapping_list;
+  f1ap_early_sync_information_request_t *early_sync_information_request;
 } f1ap_ue_context_setup_req_t;
 
 typedef struct f1ap_ue_context_setup_resp_s {

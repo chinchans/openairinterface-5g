@@ -163,6 +163,10 @@ static void nr_rrc_fill_ltm_ue_context_setup_req(f1ap_ue_context_setup_req_t *re
   ltm_cfg->reference_configuration = ref_cfg;
 
   req->ltm_configuration_id_mapping_list = mapping_list;
+
+  f1ap_early_sync_information_request_t *early_sync_req = calloc_or_fail(1, sizeof(*early_sync_req));
+  early_sync_req->request_for_rach_configuration = true;
+  req->early_sync_information_request = early_sync_req;
 }
 
 static void nr_initiate_handover(const gNB_RRC_INST *rrc,

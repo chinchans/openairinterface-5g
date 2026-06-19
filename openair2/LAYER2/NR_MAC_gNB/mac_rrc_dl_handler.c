@@ -718,11 +718,12 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   }
 
   /* Inter-gNB-DU LTM handover: process LTM IEs and include response IEs */
-  if (req->ltm_information_setup || req->ltm_configuration_id_mapping_list) {
-    LOG_I(NR_MAC, "UE %u: processing LTM UE Context Setup Request (LTMInformationSetup=%s, LTMConfigurationIDMappingList=%s)\n",
+  if (req->ltm_information_setup || req->ltm_configuration_id_mapping_list || req->early_sync_information_request) {
+    LOG_I(NR_MAC, "UE %u: processing LTM UE Context Setup Request (LTMInformationSetup=%s, LTMConfigurationIDMappingList=%s, EarlySyncInformationRequest=%s)\n",
           req->gNB_CU_ue_id,
           req->ltm_information_setup ? "present" : "absent",
-          req->ltm_configuration_id_mapping_list ? "present" : "absent");
+          req->ltm_configuration_id_mapping_list ? "present" : "absent",
+          req->early_sync_information_request ? "present" : "absent");
 
     if (req->ltm_configuration_id_mapping_list && req->ltm_configuration_id_mapping_list->len > 0) {
       const f1ap_ltm_configuration_id_mapping_item_t *item = &req->ltm_configuration_id_mapping_list->items[0];
@@ -778,17 +779,24 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
       resp.ltm_configuration = ltm_cfg;
     }
 
-    f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
-    early_ul->prachConfigurationIndex = 0;
-    early_ul->prachFrequencyOffset = 0;
-    if (scc && scc->uplinkConfigCommon && scc->uplinkConfigCommon->initialUplinkBWP
-        && scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon) {
-      NR_RACH_ConfigGeneric_t *rach =
-          &scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric;
-      early_ul->prachConfigurationIndex = rach->prach_ConfigurationIndex;
-      early_ul->prachFrequencyOffset = rach->msg1_FrequencyStart;
+    if (req->early_sync_information_request && req->early_sync_information_request->request_for_rach_configuration) {
+      f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
+      early_ul->prachConfigurationIndex = 0;
+      early_ul->prachFrequencyOffset = 0;
+      if (scc && scc->uplinkConfigCommon && scc->uplinkConfigCommon->initialUplinkBWP
+          && scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon) {
+        NR_RACH_ConfigGeneric_t *rach =
+            &scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric;
+        early_ul->prachConfigurationIndex = rach->prach_ConfigurationIndex;
+        early_ul->prachFrequencyOffset = rach->msg1_FrequencyStart;
+      }
+      resp.early_ul_sync_configuration = early_ul;
+      LOG_I(NR_MAC,
+            "UE %u: EarlyULSyncConfiguration included (PRACH config index %u, freq offset %u)\n",
+            req->gNB_CU_ue_id,
+            early_ul->prachConfigurationIndex,
+            early_ul->prachFrequencyOffset);
     }
-    resp.early_ul_sync_configuration = early_ul;
 
     if (req->ltm_information_setup && req->ltm_information_setup->setup_indication) {
       uint64_t target_cell_id = req->nr_cellid;

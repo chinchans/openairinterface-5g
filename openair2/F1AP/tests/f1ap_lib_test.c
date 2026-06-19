@@ -1017,6 +1017,10 @@ static void test_f1ap_ue_context_setup_request_ltm(void)
   mapping_list->items[0].ltm_configuration.csi_resource_configuration = csi_cfg;
   orig.ltm_configuration_id_mapping_list = mapping_list;
 
+  f1ap_early_sync_information_request_t *early_sync_req = calloc_or_fail(1, sizeof(*early_sync_req));
+  early_sync_req->request_for_rach_configuration = true;
+  orig.early_sync_information_request = early_sync_req;
+
   F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_req(&orig);
   F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
 
