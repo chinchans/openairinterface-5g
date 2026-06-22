@@ -54,6 +54,11 @@ static bool nr_meas_id_in_range(long meas_id)
   return meas_id >= 1 && meas_id <= 64;
 }
 
+static bool nr_phys_cell_id_in_range(long phys_cell_id)
+{
+  return phys_cell_id >= 0 && phys_cell_id <= 1007;
+}
+
 static const NR_MeasQuantityResults_t *nr_get_serving_cell_quantity_results(const NR_MeasResults_t *measResults)
 {
   if (measResults == NULL || measResults->measResultServingMOList.list.count < 1) {
@@ -148,6 +153,12 @@ void log_rrc_measurement_report(const gNB_RRC_UE_t *UE, const NR_MeasResults_t *
 
   const long phys_cell_id = serving.has_physCellId ? serving.physCellId : -1;
 
+  if (serving.has_physCellId && !nr_phys_cell_id_in_range(serving.physCellId)) {
+    LOG_W(NR_RRC,
+          UE_LOG_FMT ": serving-cell physCellId %ld out of range [0..1007]\n",
+          UE_LOG_ARGS(UE),
+          serving.physCellId);
+  }
   if (serving.has_rsrp && !nr_rsrp_dbm_in_range(serving.rsrp_dbm)) {
     LOG_W(NR_RRC,
           UE_LOG_FMT ": serving-cell RSRP %ld dBm out of range [-140..-44]\n",
