@@ -51,6 +51,7 @@
 #include "OCTET_STRING.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
 #include "RRC/NR/mac_rrc_dl.h"
+#include "RRC/NR/rrc_gNB_utils.h"
 #include "RRC/NR/nr_rrc_common.h"
 #include "SIMULATION/TOOLS/sim.h"
 #include "T.h"
@@ -1426,147 +1427,6 @@ fallback_rrc_setup:
   return;
 }
 
-/** @brief Convert ASN.1 RSRP-Range index to dBm (TS 38.133 Table 10.1.6.1-1). */
-static long nr_rsrp_index_to_dbm(long rsrp_index)
-{
-  return rsrp_index - 156;
-}
-
-/** @brief Convert ASN.1 RSRQ-Range index to dB (TS 38.133 Table 10.1.11.1-1). */
-static float nr_rrq_index_to_db(long rsrq_index)
-{
-  return (float)(rsrq_index - 87) / 2.0f;
-}
-
-static bool nr_rsrp_dbm_in_range(long rsrp_dbm)
-{
-  return rsrp_dbm >= -140 && rsrp_dbm <= -44;
-}
-
-static bool nr_rrq_db_in_range(float rsrq_db)
-{
-  return rsrq_db >= -19.0f && rsrq_db <= -3.0f;
-}
-
-static const NR_MeasQuantityResults_t *nr_get_serving_cell_quantity_results(const NR_MeasResults_t *measResults)
-{
-  if (measResults == NULL || measResults->measResultServingMOList.list.count < 1) {
-    return NULL;
-  }
-
-  const NR_MeasResultServMO_t *serv_mo = measResults->measResultServingMOList.list.array[0];
-  const struct NR_MeasResultNR__measResult__cellResults *cell_results = &serv_mo->measResultServingCell.measResult.cellResults;
-
-  if (cell_results->resultsSSB_Cell != NULL) {
-    return cell_results->resultsSSB_Cell;
-  }
-  if (cell_results->resultsCSI_RS_Cell != NULL) {
-    return cell_results->resultsCSI_RS_Cell;
-  }
-  return NULL;
-}
-
-/**
- * @brief Log serving-cell RSRP/RSRQ from a MeasurementReport at the gNB RRC layer.
- *        TS 38.331 §5.5.1.2 — records UE identifier (RNTI), measurements, and reception timestamp.
- */
-static void rrc_gNB_log_serving_cell_measurement_report(const gNB_RRC_UE_t *UE, const NR_MeasResults_t *measResults)
-{
-  if (UE == NULL) {
-    return;
-  }
-
-  if (measResults == NULL) {
-    LOG_W(NR_RRC, UE_LOG_FMT ": MeasurementReport received without MeasResults\n", UE_LOG_ARGS(UE));
-    return;
-  }
-
-  const NR_MeasQuantityResults_t *quantity = nr_get_serving_cell_quantity_results(measResults);
-  if (quantity == NULL) {
-    LOG_W(NR_RRC, UE_LOG_FMT ": MeasurementReport without serving-cell quantity results\n", UE_LOG_ARGS(UE));
-    return;
-  }
-
-  time_t now = time(NULL);
-  char timestamp[32] = {0};
-  struct tm tm_buf;
-  if (localtime_r(&now, &tm_buf) != NULL) {
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_buf);
-  } else {
-    snprintf(timestamp, sizeof(timestamp), "%ld", (long)now);
-  }
-
-  const long meas_id = measResults->measId;
-  long phys_cell_id = -1;
-  if (measResults->measResultServingMOList.list.count >= 1) {
-    const NR_MeasResultNR_t *serv_cell = &measResults->measResultServingMOList.list.array[0]->measResultServingCell;
-    if (serv_cell->physCellId != NULL) {
-      phys_cell_id = *serv_cell->physCellId;
-    }
-  }
-
-  if (quantity->rsrp != NULL) {
-    const long rsrp_dbm = nr_rsrp_index_to_dbm(*quantity->rsrp);
-    if (!nr_rsrp_dbm_in_range(rsrp_dbm)) {
-      LOG_W(NR_RRC,
-            UE_LOG_FMT ": serving-cell RSRP %ld dBm out of range [-140..-44]\n",
-            UE_LOG_ARGS(UE),
-            rsrp_dbm);
-    }
-    if (quantity->rsrq != NULL) {
-      const float rsrq_db = nr_rrq_index_to_db(*quantity->rsrq);
-      if (!nr_rrq_db_in_range(rsrq_db)) {
-        LOG_W(NR_RRC,
-              UE_LOG_FMT ": serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
-              UE_LOG_ARGS(UE),
-              rsrq_db);
-      }
-      LOG_I(NR_RRC,
-            "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRP %ld dBm RSRQ %.1f dB timestamp %s\n",
-            UE_LOG_ARGS(UE),
-            meas_id,
-            phys_cell_id,
-            rsrp_dbm,
-            rsrq_db,
-            timestamp);
-    } else {
-      LOG_I(NR_RRC,
-            "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRP %ld dBm timestamp %s\n",
-            UE_LOG_ARGS(UE),
-            meas_id,
-            phys_cell_id,
-            rsrp_dbm,
-            timestamp);
-    }
-    return;
-  }
-
-  if (quantity->rsrq != NULL) {
-    const float rsrq_db = nr_rrq_index_to_db(*quantity->rsrq);
-    if (!nr_rrq_db_in_range(rsrq_db)) {
-      LOG_W(NR_RRC,
-            UE_LOG_FMT ": serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
-            UE_LOG_ARGS(UE),
-            rsrq_db);
-    }
-    LOG_I(NR_RRC,
-          "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRQ %.1f dB timestamp %s\n",
-          UE_LOG_ARGS(UE),
-          meas_id,
-          phys_cell_id,
-          rsrq_db,
-          timestamp);
-    return;
-  }
-
-  LOG_W(NR_RRC,
-        UE_LOG_FMT ": MeasurementReport serving cell without RSRP or RSRQ (measId %ld physCellId %ld) timestamp %s\n",
-        UE_LOG_ARGS(UE),
-        meas_id,
-        phys_cell_id,
-        timestamp);
-}
-
 static void process_Periodical_Measurement_Report(gNB_RRC_UE_t *ue_ctxt, NR_MeasurementReport_t *measurementReport)
 {
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, ue_ctxt->measResults);
@@ -1693,7 +1553,7 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
     xer_fprint(stdout, &asn_DEF_NR_MeasurementReport, (void *)measurementReport);
 
   NR_MeasurementReport_IEs_t *measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport;
-  rrc_gNB_log_serving_cell_measurement_report(UE, &measurementReport_IEs->measResults);
+  log_rrc_measurement_report(UE, &measurementReport_IEs->measResults);
 
   NR_MeasConfig_t *meas_config = UE->measConfig;
   if (meas_config == NULL) {

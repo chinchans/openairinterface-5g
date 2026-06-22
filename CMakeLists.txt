@@ -1145,7 +1145,9 @@ set(L2_LTE_SRC
 set(L2_NR_SRC
   ${NR_PDCP_SRC}
   ${NR_SDAP_SRC}
+  ${OPENAIR2_DIR}/UTIL/time_utils.c
   ${NR_RRC_DIR}/rrc_gNB.c
+  ${NR_RRC_DIR}/rrc_gNB_utils.c
   ${NR_RRC_DIR}/mac_rrc_dl_direct.c
   ${NR_RRC_DIR}/mac_rrc_dl_f1ap.c
   ${NR_RRC_DIR}/rrc_gNB_asn1.c
