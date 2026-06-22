@@ -1468,18 +1468,22 @@ static const NR_MeasQuantityResults_t *nr_get_serving_cell_quantity_results(cons
 
 /**
  * @brief Log serving-cell RSRP/RSRQ from a MeasurementReport at the gNB RRC layer.
- *        TS 38.331 §5.5.3.1 / §5.5.3.2 — records UE identifier, measurements, and reception timestamp.
+ *        TS 38.331 §5.5.1.2 — records UE identifier (RNTI), measurements, and reception timestamp.
  */
-static void rrc_gNB_log_serving_cell_measurement_report(uint32_t rrc_ue_id, const NR_MeasResults_t *measResults)
+static void rrc_gNB_log_serving_cell_measurement_report(const gNB_RRC_UE_t *UE, const NR_MeasResults_t *measResults)
 {
+  if (UE == NULL) {
+    return;
+  }
+
   if (measResults == NULL) {
-    LOG_W(NR_RRC, "UE %u: MeasurementReport received without MeasResults\n", rrc_ue_id);
+    LOG_W(NR_RRC, UE_LOG_FMT ": MeasurementReport received without MeasResults\n", UE_LOG_ARGS(UE));
     return;
   }
 
   const NR_MeasQuantityResults_t *quantity = nr_get_serving_cell_quantity_results(measResults);
   if (quantity == NULL) {
-    LOG_W(NR_RRC, "UE %u: MeasurementReport without serving-cell quantity results\n", rrc_ue_id);
+    LOG_W(NR_RRC, UE_LOG_FMT ": MeasurementReport without serving-cell quantity results\n", UE_LOG_ARGS(UE));
     return;
   }
 
@@ -1505,21 +1509,21 @@ static void rrc_gNB_log_serving_cell_measurement_report(uint32_t rrc_ue_id, cons
     const long rsrp_dbm = nr_rsrp_index_to_dbm(*quantity->rsrp);
     if (!nr_rsrp_dbm_in_range(rsrp_dbm)) {
       LOG_W(NR_RRC,
-            "UE %u: serving-cell RSRP %ld dBm out of range [-140..-44]\n",
-            rrc_ue_id,
+            UE_LOG_FMT ": serving-cell RSRP %ld dBm out of range [-140..-44]\n",
+            UE_LOG_ARGS(UE),
             rsrp_dbm);
     }
     if (quantity->rsrq != NULL) {
       const float rsrq_db = nr_rrq_index_to_db(*quantity->rsrq);
       if (!nr_rrq_db_in_range(rsrq_db)) {
         LOG_W(NR_RRC,
-              "UE %u: serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
-              rrc_ue_id,
+              UE_LOG_FMT ": serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
+              UE_LOG_ARGS(UE),
               rsrq_db);
       }
       LOG_I(NR_RRC,
-            "MeasurementReport serving cell: UE %u measId %ld physCellId %ld RSRP %ld dBm RSRQ %.1f dB timestamp %s\n",
-            rrc_ue_id,
+            "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRP %ld dBm RSRQ %.1f dB timestamp %s\n",
+            UE_LOG_ARGS(UE),
             meas_id,
             phys_cell_id,
             rsrp_dbm,
@@ -1527,8 +1531,8 @@ static void rrc_gNB_log_serving_cell_measurement_report(uint32_t rrc_ue_id, cons
             timestamp);
     } else {
       LOG_I(NR_RRC,
-            "MeasurementReport serving cell: UE %u measId %ld physCellId %ld RSRP %ld dBm timestamp %s\n",
-            rrc_ue_id,
+            "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRP %ld dBm timestamp %s\n",
+            UE_LOG_ARGS(UE),
             meas_id,
             phys_cell_id,
             rsrp_dbm,
@@ -1541,13 +1545,13 @@ static void rrc_gNB_log_serving_cell_measurement_report(uint32_t rrc_ue_id, cons
     const float rsrq_db = nr_rrq_index_to_db(*quantity->rsrq);
     if (!nr_rrq_db_in_range(rsrq_db)) {
       LOG_W(NR_RRC,
-            "UE %u: serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
-            rrc_ue_id,
+            UE_LOG_FMT ": serving-cell RSRQ %.1f dB out of range [-19..-3]\n",
+            UE_LOG_ARGS(UE),
             rsrq_db);
     }
     LOG_I(NR_RRC,
-          "MeasurementReport serving cell: UE %u measId %ld physCellId %ld RSRQ %.1f dB timestamp %s\n",
-          rrc_ue_id,
+          "MeasurementReport serving cell: " UE_LOG_FMT " measId %ld physCellId %ld RSRQ %.1f dB timestamp %s\n",
+          UE_LOG_ARGS(UE),
           meas_id,
           phys_cell_id,
           rsrq_db,
@@ -1556,8 +1560,8 @@ static void rrc_gNB_log_serving_cell_measurement_report(uint32_t rrc_ue_id, cons
   }
 
   LOG_W(NR_RRC,
-        "UE %u: MeasurementReport serving cell without RSRP or RSRQ (measId %ld physCellId %ld) timestamp %s\n",
-        rrc_ue_id,
+        UE_LOG_FMT ": MeasurementReport serving cell without RSRP or RSRQ (measId %ld physCellId %ld) timestamp %s\n",
+        UE_LOG_ARGS(UE),
         meas_id,
         phys_cell_id,
         timestamp);
@@ -1689,7 +1693,7 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
     xer_fprint(stdout, &asn_DEF_NR_MeasurementReport, (void *)measurementReport);
 
   NR_MeasurementReport_IEs_t *measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport;
-  rrc_gNB_log_serving_cell_measurement_report(UE->rrc_ue_id, &measurementReport_IEs->measResults);
+  rrc_gNB_log_serving_cell_measurement_report(UE, &measurementReport_IEs->measResults);
 
   NR_MeasConfig_t *meas_config = UE->measConfig;
   if (meas_config == NULL) {
@@ -2110,6 +2114,7 @@ static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *m
 
       case NR_UL_DCCH_MessageType__c1_PR_measurementReport:
         if (ul_dcch_msg->message.choice.c1->choice.measurementReport != NULL) {
+          LOG_UE_UL_EVENT(UE, "Received MeasurementReport\n");
           rrc_gNB_process_MeasurementReport(rrc, UE, ul_dcch_msg->message.choice.c1->choice.measurementReport);
         } else {
           LOG_E(NR_RRC, "UE %d: No measurementReport CHOICE is given\n", ue_context_p->ue_context.rrc_ue_id);
