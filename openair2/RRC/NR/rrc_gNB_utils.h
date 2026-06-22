@@ -25,9 +25,26 @@
 #include "NR_MeasurementReport.h"
 #include "nr_rrc_defs.h"
 
+/** Normalized serving-cell measurement view extracted from NR_MeasResults (TS 38.331). */
+typedef struct nr_meas_serving_cell_log_s {
+  long measId;
+  long physCellId;
+  bool has_physCellId;
+  long rsrp_dbm;
+  bool has_rsrp;
+  float rsrq_db;
+  bool has_rsrq;
+} nr_meas_serving_cell_log_t;
+
+/**
+ * @brief Extract serving-cell RSRP/RSRQ from decoded MeasResults.
+ * @return true when at least one quantity (RSRP or RSRQ) is present.
+ */
+bool nr_extract_serving_cell_measurements(const NR_MeasResults_t *measResults, nr_meas_serving_cell_log_t *out);
+
 /**
  * @brief Log serving-cell RSRP/RSRQ from a MeasurementReport at the gNB RRC layer.
- *        TS 38.331 §5.5.5 — records UE identifier, measurements, and reception timestamp.
+ *        TS 38.331 §5.5.2 — records UE identifier, measurements, and reception timestamp.
  */
 void log_rrc_measurement_report(const gNB_RRC_UE_t *UE, const NR_MeasResults_t *measResults);
 
