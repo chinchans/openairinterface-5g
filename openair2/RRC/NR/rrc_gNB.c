@@ -516,11 +516,11 @@ static void rrc_gNB_process_RRCSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
     LOG_E(RRC, "Invalid param\n");
     return;
   }
-  rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
+ // rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
       // REMOVED: rrcSetupComplete=NULL;
   UE->Srb[2].Active = 0;
   
-  rrcSetupComplete=NULL;
+ // rrcSetupComplete=NULL;
 
   rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
 }
