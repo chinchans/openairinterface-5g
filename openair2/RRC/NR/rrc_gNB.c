@@ -2324,25 +2324,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     // handling of "target CU" information
     DevAssert(UE->ho_context->target != NULL);
     DevAssert(resp->crnti != NULL);
-    if (UE->ho_context->ltm_handover) {
-      if (resp->ltm_configuration) {
-        f1ap_ltm_free_ltm_configuration(UE->ho_context->target->ltm_configuration);
-        UE->ho_context->target->ltm_configuration = cp_f1ap_ltm_ltm_configuration(resp->ltm_configuration);
-        LOG_I(NR_RRC, "UE %u: LTM UE Context Setup acknowledged by candidate gNB-DU\n", UE->rrc_ue_id);
-      }
-      if (resp->early_ul_sync_configuration) {
-        f1ap_ltm_free_early_ul_sync_configuration(UE->ho_context->target->early_ul_sync_configuration);
-        UE->ho_context->target->early_ul_sync_configuration =
-            cp_f1ap_ltm_early_ul_sync_configuration(resp->early_ul_sync_configuration);
-        LOG_I(NR_RRC, "UE %u: received EarlyULSyncConfiguration from candidate gNB-DU\n", UE->rrc_ue_id);
-      }
-      if (resp->requested_target_cell_id) {
-        LOG_I(NR_RRC,
-              "UE %u: candidate gNB-DU accepted LTM target cell NRCellIdentity 0x%lx\n",
-              UE->rrc_ue_id,
-              (unsigned long)*resp->requested_target_cell_id);
-      }
-    }
+    rrc_gNB_apply_f1_ltm_ue_context_setup_response(UE, UE->ho_context->target, resp);
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;
     UE->ho_context->target->ho_req_ack(rrc, UE);
