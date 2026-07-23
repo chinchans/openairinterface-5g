@@ -35,15 +35,7 @@
 #include <netinet/sctp.h>
 #include <stdint.h>
 #include "collection/tree.h"
-#include "f1ap_messages_types.h"
 #include "nr_rrc_defs.h"
-
-struct gNB_RRC_UE_s;
-struct nr_ho_target_cu;
-
-void rrc_gNB_apply_f1_ltm_ue_context_setup_response(struct gNB_RRC_UE_s *ue,
-                                                    struct nr_ho_target_cu *target,
-                                                    const f1ap_ue_context_setup_resp_t *resp);
 
 int rrc_gNB_compare_ue_rnti_id(rrc_gNB_ue_context_t* c1_pP, rrc_gNB_ue_context_t* c2_pP);
 

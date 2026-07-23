@@ -47,8 +47,6 @@
 
 int CU_send_UE_CONTEXT_SETUP_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue_context_setup_req_t *req)
 {
-  /* Inter-gNB-DU LTM: LTMInformation-Setup and LTMConfigurationIDMappingList are
-   * encoded via f1ap_ltm_wire_codec into ResourceCoordinationTransferContainer. */
   F1AP_F1AP_PDU_t *pdu = encode_ue_context_setup_req(req);
 
   uint8_t *buffer = NULL;
@@ -71,7 +69,6 @@ int CU_send_UE_CONTEXT_SETUP_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue_contex
 
 int CU_handle_UE_CONTEXT_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  /* Inter-gNB-DU LTM: LTMConfiguration and related IEs decoded from wire container. */
   f1ap_ue_context_setup_resp_t resp = {0};
   if (!decode_ue_context_setup_resp(pdu, &resp)) {
     LOG_E(F1AP, "cannot decode F1 UE Context Setup Resp\n");

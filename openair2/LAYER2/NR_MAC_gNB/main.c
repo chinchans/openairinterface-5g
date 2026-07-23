@@ -74,7 +74,6 @@
 void *nrmac_stats_thread(void *arg) {
 
   gNB_MAC_INST *gNB = (gNB_MAC_INST *)arg;
-  static mac_stats_t last_prb_stats = {0};
 
   char output[MACSTATSSTRLEN] = {0};
   const char *end = output + MACSTATSSTRLEN;
@@ -87,12 +86,6 @@ void *nrmac_stats_thread(void *arg) {
   while (oai_exit == 0) {
     char *p = output;
     NR_SCHED_LOCK(&gNB->sched_lock);
-    const mac_stats_t *stat = &gNB->mac_stats;
-    const int diff_used = stat->used_prb_aggregate - last_prb_stats.used_prb_aggregate;
-    const int diff_total = stat->total_prb_aggregate - last_prb_stats.total_prb_aggregate;
-    const int prb_util_pct = diff_total > 0 ? (int)(100 * diff_used / diff_total) : 0;
-    last_prb_stats = *stat;
-    LOG_A(NR_MAC, "gNB PRB utilisation: %d%% (%d allocated / %d total PRBs)\n", prb_util_pct, diff_used, diff_total);
     p += dump_mac_stats(gNB, p, end - p, false);
     NR_SCHED_UNLOCK(&gNB->sched_lock);
     p += snprintf(p, end - p, "\n");

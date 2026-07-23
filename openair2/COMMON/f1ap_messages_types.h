@@ -501,7 +501,52 @@ typedef struct f1ap_drb_to_release_t {
   int id;
 } f1ap_drb_to_release_t;
 
-#include "src/f1ap/ie_structures/f1ap_ltm_ies.h"
+/* Rel-18 LTM IEs (internal representation; ASN.1 codegen gap - see f1ap_ltm_wire_codec) */
+#define F1AP_MAX_LTM_CONFIG_ID_MAPPING_LIST 8
+
+typedef struct f1ap_reference_configuration_information_s {
+  byte_array_t *cellGroupConfig; /* RRC CellGroupConfig OCTET STRING (optional) */
+  byte_array_t *measurementTimingConfiguration; /* RRC MeasurementTimingConfiguration OCTET STRING (optional) */
+} f1ap_reference_configuration_information_t;
+
+typedef struct f1ap_reference_configuration_s {
+  bool request_for_lower_layer_configuration_present;
+  bool request_for_lower_layer_configuration;
+  f1ap_reference_configuration_information_t *reference_configuration_information;
+} f1ap_reference_configuration_t;
+
+typedef struct f1ap_csi_resource_configuration_s {
+  byte_array_t *configuration;
+} f1ap_csi_resource_configuration_t;
+
+typedef struct f1ap_ltm_configuration_s {
+  f1ap_reference_configuration_t *reference_configuration;
+  f1ap_csi_resource_configuration_t *csi_resource_configuration;
+} f1ap_ltm_configuration_t;
+
+typedef struct f1ap_ltm_configuration_id_mapping_item_s {
+  uint8_t ltm_configuration_id; /* TS 38.473: INTEGER (0..255) */
+  uint64_t *candidate_cell_id; /* TS 38.473: NRCellIdentity OPTIONAL (36-bit) */
+  f1ap_ltm_configuration_t ltm_configuration;
+} f1ap_ltm_configuration_id_mapping_item_t;
+
+typedef struct f1ap_ltm_configuration_id_mapping_list_s {
+  int len;
+  f1ap_ltm_configuration_id_mapping_item_t *items;
+} f1ap_ltm_configuration_id_mapping_list_t;
+
+typedef struct f1ap_ltm_information_setup_s {
+  uint8_t setup_indication; /* LTM Indicator (TS 38.473 9.3.1.291) */
+} f1ap_ltm_information_setup_t;
+
+typedef struct f1ap_early_sync_information_request_s {
+  bool request_for_rach_configuration; /* RequestforRACHConfiguration (TS 38.473 9.3.1.326) */
+} f1ap_early_sync_information_request_t;
+
+typedef struct f1ap_early_ul_sync_configuration_s {
+  uint8_t prachConfigurationIndex; /* INTEGER (0..63) */
+  uint16_t prachFrequencyOffset; /* INTEGER (0..8383) */
+} f1ap_early_ul_sync_configuration_t;
 
 typedef struct f1ap_ue_context_setup_req_s {
   uint32_t gNB_CU_ue_id;

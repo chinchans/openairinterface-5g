@@ -39,39 +39,8 @@
 #include "common/utils/LOG/log.h"
 #include "linear_alloc.h"
 #include "openair2/F1AP/f1ap_ids.h"
-#include "openair2/F1AP/lib/f1ap_ltm_wire_codec.h"
-#include "rrc_gNB_mobility.h"
 #include "tree.h"
 #include "rrc_gNB_radio_bearers.h"
-
-void rrc_gNB_apply_f1_ltm_ue_context_setup_response(gNB_RRC_UE_t *ue,
-                                                    nr_ho_target_cu_t *target,
-                                                    const f1ap_ue_context_setup_resp_t *resp)
-{
-  DevAssert(ue != NULL);
-  DevAssert(target != NULL);
-  DevAssert(resp != NULL);
-
-  if (!ue->ho_context || !ue->ho_context->ltm_handover)
-    return;
-
-  if (resp->ltm_configuration) {
-    f1ap_ltm_free_ltm_configuration(target->ltm_configuration);
-    target->ltm_configuration = cp_f1ap_ltm_ltm_configuration(resp->ltm_configuration);
-    LOG_I(NR_RRC, "UE %u: LTM UE Context Setup acknowledged by candidate gNB-DU\n", ue->rrc_ue_id);
-  }
-  if (resp->early_ul_sync_configuration) {
-    f1ap_ltm_free_early_ul_sync_configuration(target->early_ul_sync_configuration);
-    target->early_ul_sync_configuration = cp_f1ap_ltm_early_ul_sync_configuration(resp->early_ul_sync_configuration);
-    LOG_I(NR_RRC, "UE %u: received EarlyULSyncConfiguration from candidate gNB-DU\n", ue->rrc_ue_id);
-  }
-  if (resp->requested_target_cell_id) {
-    LOG_I(NR_RRC,
-          "UE %u: candidate gNB-DU accepted LTM target cell NRCellIdentity 0x%lx\n",
-          ue->rrc_ue_id,
-          (unsigned long)*resp->requested_target_cell_id);
-  }
-}
 
 static void rrc_gNB_ue_context_update_time(rrc_gNB_ue_context_t *ctxt)
 {
