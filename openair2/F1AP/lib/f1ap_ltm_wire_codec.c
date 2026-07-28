@@ -185,6 +185,11 @@ static bool ltm_wire_read_ba_ptr(ltm_wire_reader_t *r, byte_array_t **out)
   return true;
 }
 
+static bool ltm_wire_encode_tci_states_configurations_list(ltm_wire_writer_t *w,
+                                                           const f1ap_ltm_tci_states_configurations_list_t *list);
+static bool ltm_wire_decode_tci_states_configurations_list(ltm_wire_reader_t *r,
+                                                           f1ap_ltm_tci_states_configurations_list_t **out);
+
 static bool ltm_wire_encode_reference_configuration_information(ltm_wire_writer_t *w,
                                                                   const f1ap_reference_configuration_information_t *rci)
 {
@@ -321,6 +326,40 @@ static bool ltm_wire_encode_ltm_configuration(ltm_wire_writer_t *w, const f1ap_l
     if (!ltm_wire_encode_csi_resource_configuration(w, lc->csi_resource_configuration))
       return false;
   }
+  if (lc->ssb_information || lc->reference_configuration_information
+      || lc->complete_candidate_configuration_indicator_present
+      || lc->ltm_cfra_resource_configuration || lc->ltm_cfra_resource_configuration_for_sul
+      || lc->tci_states_configurations_list) {
+    if (!ltm_wire_write_u8(w, lc->ssb_information ? 1 : 0))
+      return false;
+    if (lc->ssb_information && !ltm_wire_write_ba(w, lc->ssb_information))
+      return false;
+    if (!ltm_wire_write_u8(w, lc->complete_candidate_configuration_indicator_present ? 1 : 0))
+      return false;
+    if (lc->complete_candidate_configuration_indicator_present
+        && !ltm_wire_write_u8(w, lc->complete_candidate_configuration_indicator ? 1 : 0))
+      return false;
+    if (!ltm_wire_write_u8(w, lc->reference_configuration_information ? 1 : 0))
+      return false;
+    if (lc->reference_configuration_information
+        && !ltm_wire_encode_reference_configuration_information(w, lc->reference_configuration_information))
+      return false;
+    if (!ltm_wire_write_u8(w, lc->ltm_cfra_resource_configuration ? 1 : 0))
+      return false;
+    if (lc->ltm_cfra_resource_configuration
+        && !ltm_wire_write_ba(w, lc->ltm_cfra_resource_configuration))
+      return false;
+    if (!ltm_wire_write_u8(w, lc->ltm_cfra_resource_configuration_for_sul ? 1 : 0))
+      return false;
+    if (lc->ltm_cfra_resource_configuration_for_sul
+        && !ltm_wire_write_ba(w, lc->ltm_cfra_resource_configuration_for_sul))
+      return false;
+    if (!ltm_wire_write_u8(w, lc->tci_states_configurations_list ? 1 : 0))
+      return false;
+    if (lc->tci_states_configurations_list
+        && !ltm_wire_encode_tci_states_configurations_list(w, lc->tci_states_configurations_list))
+      return false;
+  }
   return true;
 }
 
@@ -346,6 +385,56 @@ static bool ltm_wire_decode_ltm_configuration(ltm_wire_reader_t *r, f1ap_ltm_con
     return false;
   if (crc_present) {
     if (!ltm_wire_decode_csi_resource_configuration(r, &(*out)->csi_resource_configuration))
+      return false;
+  }
+  if (r->pos >= r->len)
+    return true;
+  uint8_t ssb_present = 0;
+  if (!ltm_wire_read_u8(r, &ssb_present))
+    return false;
+  if (ssb_present) {
+    if (!ltm_wire_read_ba_ptr(r, &(*out)->ssb_information))
+      return false;
+  }
+  uint8_t cci_present = 0;
+  if (!ltm_wire_read_u8(r, &cci_present))
+    return false;
+  (*out)->complete_candidate_configuration_indicator_present = cci_present != 0;
+  if (cci_present) {
+    uint8_t val = 0;
+    if (!ltm_wire_read_u8(r, &val))
+      return false;
+    (*out)->complete_candidate_configuration_indicator = val != 0;
+  }
+  uint8_t rci_present = 0;
+  if (!ltm_wire_read_u8(r, &rci_present))
+    return false;
+  if (rci_present) {
+    (*out)->reference_configuration_information = calloc_or_fail(1, sizeof(*(*out)->reference_configuration_information));
+    if (!ltm_wire_decode_reference_configuration_information(r, (*out)->reference_configuration_information))
+      return false;
+  }
+  if (r->pos >= r->len)
+    return true;
+  uint8_t cfra_present = 0;
+  if (!ltm_wire_read_u8(r, &cfra_present))
+    return false;
+  if (cfra_present) {
+    if (!ltm_wire_read_ba_ptr(r, &(*out)->ltm_cfra_resource_configuration))
+      return false;
+  }
+  uint8_t sul_present = 0;
+  if (!ltm_wire_read_u8(r, &sul_present))
+    return false;
+  if (sul_present) {
+    if (!ltm_wire_read_ba_ptr(r, &(*out)->ltm_cfra_resource_configuration_for_sul))
+      return false;
+  }
+  uint8_t tci_present = 0;
+  if (!ltm_wire_read_u8(r, &tci_present))
+    return false;
+  if (tci_present) {
+    if (!ltm_wire_decode_tci_states_configurations_list(r, &(*out)->tci_states_configurations_list))
       return false;
   }
   return true;
@@ -428,7 +517,20 @@ static bool ltm_wire_encode_early_sync_information_request(ltm_wire_writer_t *w,
   }
   if (!ltm_wire_write_u8(w, 1))
     return false;
-  return ltm_wire_write_u8(w, req->request_for_rach_configuration ? 1 : 0);
+  if (!ltm_wire_write_u8(w, req->request_for_rach_configuration ? 1 : 0))
+    return false;
+  if (!req->ltm_gnb_du_ids_list || req->ltm_gnb_du_ids_list->len == 0) {
+    return ltm_wire_write_u16(w, 0);
+  }
+  if (req->ltm_gnb_du_ids_list->len > F1AP_MAX_LTM_GNB_DU_IDS)
+    return false;
+  if (!ltm_wire_write_u16(w, (uint16_t)req->ltm_gnb_du_ids_list->len))
+    return false;
+  for (int i = 0; i < req->ltm_gnb_du_ids_list->len; ++i) {
+    if (!ltm_wire_write_u32(w, req->ltm_gnb_du_ids_list->gnb_du_ids[i]))
+      return false;
+  }
+  return true;
 }
 
 static bool ltm_wire_decode_early_sync_information_request(ltm_wire_reader_t *r,
@@ -446,6 +548,22 @@ static bool ltm_wire_decode_early_sync_information_request(ltm_wire_reader_t *r,
   if (!ltm_wire_read_u8(r, &val))
     return false;
   (*out)->request_for_rach_configuration = val != 0;
+  if (r->pos >= r->len)
+    return true;
+  uint16_t count = 0;
+  if (!ltm_wire_read_u16(r, &count))
+    return false;
+  if (count == 0)
+    return true;
+  if (count > F1AP_MAX_LTM_GNB_DU_IDS)
+    return false;
+  (*out)->ltm_gnb_du_ids_list = calloc_or_fail(1, sizeof(*(*out)->ltm_gnb_du_ids_list));
+  (*out)->ltm_gnb_du_ids_list->len = count;
+  (*out)->ltm_gnb_du_ids_list->gnb_du_ids = calloc_or_fail(count, sizeof(*(*out)->ltm_gnb_du_ids_list->gnb_du_ids));
+  for (int i = 0; i < count; ++i) {
+    if (!ltm_wire_read_u32(r, &(*out)->ltm_gnb_du_ids_list->gnb_du_ids[i]))
+      return false;
+  }
   return true;
 }
 
@@ -458,7 +576,21 @@ static bool ltm_wire_encode_information_setup(ltm_wire_writer_t *w, const f1ap_l
   }
   if (!ltm_wire_write_u8(w, 1))
     return false;
-  return ltm_wire_write_u8(w, setup->setup_indication);
+  if (!ltm_wire_write_u8(w, setup->setup_indication))
+    return false;
+  if (!ltm_wire_write_u8(w, setup->reference_configuration ? 1 : 0))
+    return false;
+  if (setup->reference_configuration) {
+    if (!ltm_wire_encode_reference_configuration(w, setup->reference_configuration))
+      return false;
+  }
+  if (!ltm_wire_write_u8(w, setup->csi_resource_configuration ? 1 : 0))
+    return false;
+  if (setup->csi_resource_configuration) {
+    if (!ltm_wire_encode_csi_resource_configuration(w, setup->csi_resource_configuration))
+      return false;
+  }
+  return true;
 }
 
 static bool ltm_wire_decode_information_setup(ltm_wire_reader_t *r, f1ap_ltm_information_setup_t **out)
@@ -471,7 +603,25 @@ static bool ltm_wire_decode_information_setup(ltm_wire_reader_t *r, f1ap_ltm_inf
     return true;
   }
   *out = calloc_or_fail(1, sizeof(**out));
-  return ltm_wire_read_u8(r, &(*out)->setup_indication);
+  if (!ltm_wire_read_u8(r, &(*out)->setup_indication))
+    return false;
+  if (r->pos >= r->len)
+    return true;
+  uint8_t rc_present = 0;
+  if (!ltm_wire_read_u8(r, &rc_present))
+    return false;
+  if (rc_present) {
+    if (!ltm_wire_decode_reference_configuration(r, &(*out)->reference_configuration))
+      return false;
+  }
+  uint8_t crc_present = 0;
+  if (!ltm_wire_read_u8(r, &crc_present))
+    return false;
+  if (crc_present) {
+    if (!ltm_wire_decode_csi_resource_configuration(r, &(*out)->csi_resource_configuration))
+      return false;
+  }
+  return true;
 }
 
 static bool ltm_wire_encode_early_ul_sync_configuration(ltm_wire_writer_t *w,
@@ -752,6 +902,460 @@ bool f1ap_ltm_wire_decode_ue_ctx_setup_resp_ltm(const byte_array_t *ba, f1ap_ue_
   return true;
 }
 
+static bool ltm_wire_append_tagged_ie(ltm_wire_writer_t *payload, uint16_t tag, const ltm_wire_writer_t *ie, uint16_t *num_tags)
+{
+  if (!ltm_wire_write_u16(payload, tag))
+    return false;
+  if (!ltm_wire_write_u32(payload, (uint32_t)ie->pos))
+    return false;
+  if (!ltm_wire_writer_ensure(payload, ie->pos))
+    return false;
+  memcpy(payload->buf + payload->pos, ie->buf, ie->pos);
+  payload->pos += ie->pos;
+  (*num_tags)++;
+  return true;
+}
+
+static bool ltm_wire_encode_information_modify(ltm_wire_writer_t *w, const f1ap_ltm_information_modify_t *mod)
+{
+  if (!mod) {
+    if (!ltm_wire_write_u8(w, 0))
+      return false;
+    return true;
+  }
+  if (!ltm_wire_write_u8(w, 1))
+    return false;
+  if (!ltm_wire_write_u8(w, mod->ltm_indicator))
+    return false;
+  if (!ltm_wire_write_u8(w, mod->reference_configuration ? 1 : 0))
+    return false;
+  if (mod->reference_configuration) {
+    if (!ltm_wire_encode_reference_configuration(w, mod->reference_configuration))
+      return false;
+  }
+  if (!ltm_wire_write_u8(w, mod->csi_resource_configuration ? 1 : 0))
+    return false;
+  if (mod->csi_resource_configuration) {
+    if (!ltm_wire_encode_csi_resource_configuration(w, mod->csi_resource_configuration))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_decode_information_modify(ltm_wire_reader_t *r, f1ap_ltm_information_modify_t **out)
+{
+  uint8_t present = 0;
+  if (!ltm_wire_read_u8(r, &present))
+    return false;
+  if (!present) {
+    *out = NULL;
+    return true;
+  }
+  *out = calloc_or_fail(1, sizeof(**out));
+  if (!ltm_wire_read_u8(r, &(*out)->ltm_indicator))
+    return false;
+  uint8_t rc_present = 0;
+  if (!ltm_wire_read_u8(r, &rc_present))
+    return false;
+  if (rc_present) {
+    if (!ltm_wire_decode_reference_configuration(r, &(*out)->reference_configuration))
+      return false;
+  }
+  uint8_t crc_present = 0;
+  if (!ltm_wire_read_u8(r, &crc_present))
+    return false;
+  if (crc_present) {
+    if (!ltm_wire_decode_csi_resource_configuration(r, &(*out)->csi_resource_configuration))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_encode_cells_to_be_released_list(ltm_wire_writer_t *w,
+                                                      const f1ap_ltm_cells_to_be_released_list_t *list)
+{
+  if (!list || list->len == 0) {
+    if (!ltm_wire_write_u16(w, 0))
+      return false;
+    return true;
+  }
+  if (list->len > F1AP_MAX_LTM_CELLS_TO_BE_RELEASED)
+    return false;
+  if (!ltm_wire_write_u16(w, (uint16_t)list->len))
+    return false;
+  for (int i = 0; i < list->len; ++i) {
+    if (!ltm_wire_write_u64(w, list->cell_ids[i]))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_decode_cells_to_be_released_list(ltm_wire_reader_t *r,
+                                                      f1ap_ltm_cells_to_be_released_list_t **out)
+{
+  uint16_t count = 0;
+  if (!ltm_wire_read_u16(r, &count))
+    return false;
+  if (count == 0) {
+    *out = NULL;
+    return true;
+  }
+  if (count > F1AP_MAX_LTM_CELLS_TO_BE_RELEASED)
+    return false;
+  *out = calloc_or_fail(1, sizeof(**out));
+  (*out)->len = count;
+  (*out)->cell_ids = calloc_or_fail(count, sizeof(*(*out)->cell_ids));
+  for (int i = 0; i < count; ++i) {
+    if (!ltm_wire_read_u64(r, &(*out)->cell_ids[i]))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_encode_cfra_resource_config_list(ltm_wire_writer_t *w,
+                                                      const f1ap_ltm_cfra_resource_config_list_t *list)
+{
+  if (!list || list->len == 0) {
+    if (!ltm_wire_write_u16(w, 0))
+      return false;
+    return true;
+  }
+  if (list->len > F1AP_MAX_LTM_CFRA_RESOURCE_CONFIG_LIST)
+    return false;
+  if (!ltm_wire_write_u16(w, (uint16_t)list->len))
+    return false;
+  for (int i = 0; i < list->len; ++i) {
+    const f1ap_ltm_cfra_resource_config_item_t *item = &list->items[i];
+    if (!ltm_wire_write_u64(w, item->cell_id))
+      return false;
+    if (!ltm_wire_write_u8(w, item->ltm_cfra_resource_configuration ? 1 : 0))
+      return false;
+    if (item->ltm_cfra_resource_configuration
+        && !ltm_wire_write_ba(w, item->ltm_cfra_resource_configuration))
+      return false;
+    if (!ltm_wire_write_u8(w, item->ltm_cfra_resource_configuration_for_sul ? 1 : 0))
+      return false;
+    if (item->ltm_cfra_resource_configuration_for_sul
+        && !ltm_wire_write_ba(w, item->ltm_cfra_resource_configuration_for_sul))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_decode_cfra_resource_config_list(ltm_wire_reader_t *r,
+                                                      f1ap_ltm_cfra_resource_config_list_t **out)
+{
+  uint16_t count = 0;
+  if (!ltm_wire_read_u16(r, &count))
+    return false;
+  if (count == 0) {
+    *out = NULL;
+    return true;
+  }
+  if (count > F1AP_MAX_LTM_CFRA_RESOURCE_CONFIG_LIST)
+    return false;
+  *out = calloc_or_fail(1, sizeof(**out));
+  (*out)->len = count;
+  (*out)->items = calloc_or_fail(count, sizeof(*(*out)->items));
+  for (int i = 0; i < count; ++i) {
+    if (!ltm_wire_read_u64(r, &(*out)->items[i].cell_id))
+      return false;
+    uint8_t cfra_present = 0;
+    if (!ltm_wire_read_u8(r, &cfra_present))
+      return false;
+    if (cfra_present) {
+      if (!ltm_wire_read_ba_ptr(r, &(*out)->items[i].ltm_cfra_resource_configuration))
+        return false;
+    }
+    uint8_t sul_present = 0;
+    if (!ltm_wire_read_u8(r, &sul_present))
+      return false;
+    if (sul_present) {
+      if (!ltm_wire_read_ba_ptr(r, &(*out)->items[i].ltm_cfra_resource_configuration_for_sul))
+        return false;
+    }
+  }
+  return true;
+}
+
+static bool ltm_wire_encode_reset_information(ltm_wire_writer_t *w, const f1ap_ltm_reset_information_t *info)
+{
+  return ltm_wire_write_ba(w, info ? info->configuration : NULL);
+}
+
+static bool ltm_wire_decode_reset_information(ltm_wire_reader_t *r, f1ap_ltm_reset_information_t **out)
+{
+  byte_array_t *ba = NULL;
+  if (!ltm_wire_read_ba_ptr(r, &ba))
+    return false;
+  if (!ba) {
+    *out = NULL;
+    return true;
+  }
+  *out = calloc_or_fail(1, sizeof(**out));
+  (*out)->configuration = ba;
+  return true;
+}
+
+static bool ltm_wire_encode_tci_states_configurations_list(ltm_wire_writer_t *w,
+                                                           const f1ap_ltm_tci_states_configurations_list_t *list)
+{
+  if (!list || list->len == 0) {
+    if (!ltm_wire_write_u16(w, 0))
+      return false;
+    return true;
+  }
+  if (list->len > F1AP_MAX_LTM_TCI_STATES_CONFIGURATIONS)
+    return false;
+  if (!ltm_wire_write_u16(w, (uint16_t)list->len))
+    return false;
+  for (int i = 0; i < list->len; ++i) {
+    if (!ltm_wire_write_ba(w, list->items[i].tci_states_configurations_list))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_decode_tci_states_configurations_list(ltm_wire_reader_t *r,
+                                                           f1ap_ltm_tci_states_configurations_list_t **out)
+{
+  uint16_t count = 0;
+  if (!ltm_wire_read_u16(r, &count))
+    return false;
+  if (count == 0) {
+    *out = NULL;
+    return true;
+  }
+  if (count > F1AP_MAX_LTM_TCI_STATES_CONFIGURATIONS)
+    return false;
+  *out = calloc_or_fail(1, sizeof(**out));
+  (*out)->len = count;
+  (*out)->items = calloc_or_fail(count, sizeof(*(*out)->items));
+  for (int i = 0; i < count; ++i) {
+    if (!ltm_wire_read_ba_ptr(r, &(*out)->items[i].tci_states_configurations_list))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_encode_pc5_rlc_channels_to_be_released_list(ltm_wire_writer_t *w,
+                                                                   const f1ap_pc5_rlc_channel_to_be_released_list_t *list)
+{
+  if (!list || list->len == 0) {
+    if (!ltm_wire_write_u16(w, 0))
+      return false;
+    return true;
+  }
+  if (list->len > F1AP_MAX_PC5_RLC_CHANNELS_TO_BE_RELEASED)
+    return false;
+  if (!ltm_wire_write_u16(w, (uint16_t)list->len))
+    return false;
+  for (int i = 0; i < list->len; ++i) {
+    if (!ltm_wire_write_u16(w, list->items[i].pc5_rlc_channel_id))
+      return false;
+    if (!ltm_wire_write_u8(w, list->items[i].remote_ue_local_id ? 1 : 0))
+      return false;
+    if (list->items[i].remote_ue_local_id
+        && !ltm_wire_write_u16(w, *list->items[i].remote_ue_local_id))
+      return false;
+  }
+  return true;
+}
+
+static bool ltm_wire_decode_pc5_rlc_channels_to_be_released_list(ltm_wire_reader_t *r,
+                                                                 f1ap_pc5_rlc_channel_to_be_released_list_t **out)
+{
+  uint16_t count = 0;
+  if (!ltm_wire_read_u16(r, &count))
+    return false;
+  if (count == 0) {
+    *out = NULL;
+    return true;
+  }
+  if (count > F1AP_MAX_PC5_RLC_CHANNELS_TO_BE_RELEASED)
+    return false;
+  *out = calloc_or_fail(1, sizeof(**out));
+  (*out)->len = count;
+  (*out)->items = calloc_or_fail(count, sizeof(*(*out)->items));
+  for (int i = 0; i < count; ++i) {
+    if (!ltm_wire_read_u16(r, &(*out)->items[i].pc5_rlc_channel_id))
+      return false;
+    uint8_t remote_present = 0;
+    if (!ltm_wire_read_u8(r, &remote_present))
+      return false;
+    if (remote_present) {
+      (*out)->items[i].remote_ue_local_id = malloc_or_fail(sizeof(*(*out)->items[i].remote_ue_local_id));
+      if (!ltm_wire_read_u16(r, (*out)->items[i].remote_ue_local_id))
+        return false;
+    }
+  }
+  return true;
+}
+
+#define LTM_WIRE_ENCODE_MOD_TAG(payload, num_tags, tag, encode_fn, arg) \
+  do { \
+    ltm_wire_writer_t ie = {0}; \
+    if (!encode_fn(&ie, arg)) { \
+      free(ie.buf); \
+      goto fail; \
+    } \
+    if (!ltm_wire_append_tagged_ie(payload, tag, &ie, num_tags)) { \
+      free(ie.buf); \
+      goto fail; \
+    } \
+    free(ie.buf); \
+  } while (0)
+
+byte_array_t *f1ap_ltm_wire_encode_ue_ctx_mod_req_ltm(const f1ap_ue_context_mod_req_t *req)
+{
+  if (!req)
+    return NULL;
+  if (!req->ltm_information_modify && !req->ltm_configuration_id_mapping_list && !req->ltm_cells_to_be_released_list
+      && !req->early_sync_information_request && !req->ltm_cfra_resource_config_list && !req->ltm_reset_information
+      && !req->ltm_tci_states_configurations_list && !req->pc5_rlc_channels_to_be_released_list)
+    return NULL;
+
+  ltm_wire_writer_t payload = {0};
+  uint16_t num_tags = 0;
+
+  if (req->ltm_information_modify)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_INFORMATION_MODIFY,
+                            ltm_wire_encode_information_modify, req->ltm_information_modify);
+  if (req->ltm_configuration_id_mapping_list)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_CONFIGURATION_ID_MAPPING_LIST,
+                            ltm_wire_encode_configuration_id_mapping_list, req->ltm_configuration_id_mapping_list);
+  if (req->ltm_cells_to_be_released_list)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_LTM_CELLS_TO_BE_RELEASED_LIST,
+                            ltm_wire_encode_cells_to_be_released_list, req->ltm_cells_to_be_released_list);
+  if (req->early_sync_information_request)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST,
+                            ltm_wire_encode_early_sync_information_request, req->early_sync_information_request);
+  if (req->ltm_cfra_resource_config_list)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_LTM_CFRA_RESOURCE_CONFIG_LIST,
+                            ltm_wire_encode_cfra_resource_config_list, req->ltm_cfra_resource_config_list);
+  if (req->ltm_reset_information)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_LTM_RESET_INFORMATION,
+                            ltm_wire_encode_reset_information, req->ltm_reset_information);
+  if (req->ltm_tci_states_configurations_list)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_LTM_TCI_STATES_CONFIGURATIONS_LIST,
+                            ltm_wire_encode_tci_states_configurations_list, req->ltm_tci_states_configurations_list);
+  if (req->pc5_rlc_channels_to_be_released_list)
+    LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_PC5_RLC_CHANNELS_TO_BE_RELEASED_LIST,
+                            ltm_wire_encode_pc5_rlc_channels_to_be_released_list, req->pc5_rlc_channels_to_be_released_list);
+
+  return ltm_wire_finalize(&payload, num_tags);
+fail:
+  free(payload.buf);
+  return NULL;
+}
+
+bool f1ap_ltm_wire_decode_ue_ctx_mod_req_ltm(const byte_array_t *ba, f1ap_ue_context_mod_req_t *req)
+{
+  if (!ba || !req || !f1ap_ltm_wire_is_ltm_container(ba))
+    return false;
+
+  ltm_wire_reader_t r = {.buf = ba->buf, .len = ba->len};
+  uint16_t num_tags = 0;
+  if (!ltm_wire_parse_header(&r, &num_tags))
+    return false;
+
+  for (uint16_t t = 0; t < num_tags; ++t) {
+    uint16_t tag = 0;
+    uint32_t ie_len = 0;
+    if (!ltm_wire_read_u16(&r, &tag) || !ltm_wire_read_u32(&r, &ie_len))
+      return false;
+    if (r.pos + ie_len > r.len)
+      return false;
+    ltm_wire_reader_t ie = {.buf = r.buf + r.pos, .len = ie_len};
+    r.pos += ie_len;
+
+    switch (tag) {
+      case F1AP_LTM_WIRE_TAG_INFORMATION_MODIFY:
+        if (!ltm_wire_decode_information_modify(&ie, &req->ltm_information_modify))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_CONFIGURATION_ID_MAPPING_LIST:
+        if (!ltm_wire_decode_configuration_id_mapping_list(&ie, &req->ltm_configuration_id_mapping_list))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_LTM_CELLS_TO_BE_RELEASED_LIST:
+        if (!ltm_wire_decode_cells_to_be_released_list(&ie, &req->ltm_cells_to_be_released_list))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST:
+        if (!ltm_wire_decode_early_sync_information_request(&ie, &req->early_sync_information_request))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_LTM_CFRA_RESOURCE_CONFIG_LIST:
+        if (!ltm_wire_decode_cfra_resource_config_list(&ie, &req->ltm_cfra_resource_config_list))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_LTM_RESET_INFORMATION:
+        if (!ltm_wire_decode_reset_information(&ie, &req->ltm_reset_information))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_LTM_TCI_STATES_CONFIGURATIONS_LIST:
+        if (!ltm_wire_decode_tci_states_configurations_list(&ie, &req->ltm_tci_states_configurations_list))
+          return false;
+        break;
+      case F1AP_LTM_WIRE_TAG_PC5_RLC_CHANNELS_TO_BE_RELEASED_LIST:
+        if (!ltm_wire_decode_pc5_rlc_channels_to_be_released_list(&ie, &req->pc5_rlc_channels_to_be_released_list))
+          return false;
+        break;
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
+byte_array_t *f1ap_ltm_wire_encode_ue_ctx_mod_resp_ltm(const f1ap_ue_context_mod_resp_t *resp)
+{
+  if (!resp || !resp->ltm_configuration)
+    return NULL;
+
+  ltm_wire_writer_t payload = {0};
+  uint16_t num_tags = 0;
+  LTM_WIRE_ENCODE_MOD_TAG(&payload, &num_tags, F1AP_LTM_WIRE_TAG_LTM_CONFIGURATION,
+                          ltm_wire_encode_ltm_configuration, resp->ltm_configuration);
+  return ltm_wire_finalize(&payload, num_tags);
+fail:
+  free(payload.buf);
+  return NULL;
+}
+
+bool f1ap_ltm_wire_decode_ue_ctx_mod_resp_ltm(const byte_array_t *ba, f1ap_ue_context_mod_resp_t *resp)
+{
+  if (!ba || !resp || !f1ap_ltm_wire_is_ltm_container(ba))
+    return false;
+
+  ltm_wire_reader_t r = {.buf = ba->buf, .len = ba->len};
+  uint16_t num_tags = 0;
+  if (!ltm_wire_parse_header(&r, &num_tags))
+    return false;
+
+  for (uint16_t t = 0; t < num_tags; ++t) {
+    uint16_t tag = 0;
+    uint32_t ie_len = 0;
+    if (!ltm_wire_read_u16(&r, &tag) || !ltm_wire_read_u32(&r, &ie_len))
+      return false;
+    if (r.pos + ie_len > r.len)
+      return false;
+    ltm_wire_reader_t ie = {.buf = r.buf + r.pos, .len = ie_len};
+    r.pos += ie_len;
+
+    switch (tag) {
+      case F1AP_LTM_WIRE_TAG_LTM_CONFIGURATION:
+        if (!ltm_wire_decode_ltm_configuration(&ie, &resp->ltm_configuration))
+          return false;
+        break;
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
 void f1ap_ltm_free_reference_configuration_information(f1ap_reference_configuration_information_t *rci)
 {
   if (!rci)
@@ -853,6 +1457,14 @@ void f1ap_ltm_free_ltm_configuration(f1ap_ltm_configuration_t *lc)
     return;
   f1ap_ltm_free_reference_configuration(lc->reference_configuration);
   f1ap_ltm_free_csi_resource_configuration(lc->csi_resource_configuration);
+  FREE_OPT_BYTE_ARRAY(lc->ssb_information);
+  FREE_OPT_BYTE_ARRAY(lc->ltm_cfra_resource_configuration);
+  FREE_OPT_BYTE_ARRAY(lc->ltm_cfra_resource_configuration_for_sul);
+  if (lc->reference_configuration_information) {
+    f1ap_ltm_free_reference_configuration_information(lc->reference_configuration_information);
+    free(lc->reference_configuration_information);
+  }
+  f1ap_ltm_free_tci_states_configurations_list(lc->tci_states_configurations_list);
   free(lc);
 }
 
@@ -863,14 +1475,45 @@ f1ap_ltm_configuration_t *cp_f1ap_ltm_ltm_configuration(const f1ap_ltm_configura
   f1ap_ltm_configuration_t *cp = calloc_or_fail(1, sizeof(*cp));
   cp->reference_configuration = cp_f1ap_ltm_reference_configuration(orig->reference_configuration);
   cp->csi_resource_configuration = cp_f1ap_ltm_csi_resource_configuration(orig->csi_resource_configuration);
+  CP_OPT_BYTE_ARRAY(cp->ssb_information, orig->ssb_information);
+  cp->complete_candidate_configuration_indicator_present = orig->complete_candidate_configuration_indicator_present;
+  cp->complete_candidate_configuration_indicator = orig->complete_candidate_configuration_indicator;
+  CP_OPT_BYTE_ARRAY(cp->ltm_cfra_resource_configuration, orig->ltm_cfra_resource_configuration);
+  CP_OPT_BYTE_ARRAY(cp->ltm_cfra_resource_configuration_for_sul, orig->ltm_cfra_resource_configuration_for_sul);
+  if (orig->reference_configuration_information) {
+    cp->reference_configuration_information = calloc_or_fail(1, sizeof(*cp->reference_configuration_information));
+    *cp->reference_configuration_information =
+        cp_f1ap_ltm_reference_configuration_information(orig->reference_configuration_information);
+  }
+  cp->tci_states_configurations_list = cp_f1ap_ltm_tci_states_configurations_list(orig->tci_states_configurations_list);
   return cp;
 }
 
 bool eq_f1ap_ltm_ltm_configuration(const f1ap_ltm_configuration_t *a, const f1ap_ltm_configuration_t *b)
 {
-  return eq_f1ap_ltm_reference_configuration(a ? a->reference_configuration : NULL, b ? b->reference_configuration : NULL)
-         && eq_f1ap_ltm_csi_resource_configuration(a ? a->csi_resource_configuration : NULL,
-                                                   b ? b->csi_resource_configuration : NULL);
+  if (!eq_f1ap_ltm_reference_configuration(a ? a->reference_configuration : NULL, b ? b->reference_configuration : NULL))
+    return false;
+  if (!eq_f1ap_ltm_csi_resource_configuration(a ? a->csi_resource_configuration : NULL,
+                                            b ? b->csi_resource_configuration : NULL))
+    return false;
+  if (!ltm_eq_ba_ptr(a ? a->ssb_information : NULL, b ? b->ssb_information : NULL))
+    return false;
+  if ((a && a->complete_candidate_configuration_indicator_present)
+      != (b && b->complete_candidate_configuration_indicator_present))
+    return false;
+  if (a && a->complete_candidate_configuration_indicator_present
+      && a->complete_candidate_configuration_indicator != b->complete_candidate_configuration_indicator)
+    return false;
+  if (!ltm_eq_ba_ptr(a ? a->ltm_cfra_resource_configuration : NULL, b ? b->ltm_cfra_resource_configuration : NULL))
+    return false;
+  if (!ltm_eq_ba_ptr(a ? a->ltm_cfra_resource_configuration_for_sul : NULL,
+                     b ? b->ltm_cfra_resource_configuration_for_sul : NULL))
+    return false;
+  if (!eq_f1ap_ltm_reference_configuration_information(
+      a ? a->reference_configuration_information : NULL, b ? b->reference_configuration_information : NULL))
+    return false;
+  return eq_f1ap_ltm_tci_states_configurations_list(a ? a->tci_states_configurations_list : NULL,
+                                                    b ? b->tci_states_configurations_list : NULL);
 }
 
 void f1ap_ltm_free_configuration_id_mapping_list(f1ap_ltm_configuration_id_mapping_list_t *list)
@@ -883,6 +1526,16 @@ void f1ap_ltm_free_configuration_id_mapping_list(f1ap_ltm_configuration_id_mappi
     lc->reference_configuration = NULL;
     f1ap_ltm_free_csi_resource_configuration(lc->csi_resource_configuration);
     lc->csi_resource_configuration = NULL;
+    FREE_OPT_BYTE_ARRAY(lc->ssb_information);
+    FREE_OPT_BYTE_ARRAY(lc->ltm_cfra_resource_configuration);
+    FREE_OPT_BYTE_ARRAY(lc->ltm_cfra_resource_configuration_for_sul);
+    if (lc->reference_configuration_information) {
+      f1ap_ltm_free_reference_configuration_information(lc->reference_configuration_information);
+      free(lc->reference_configuration_information);
+      lc->reference_configuration_information = NULL;
+    }
+    f1ap_ltm_free_tci_states_configurations_list(lc->tci_states_configurations_list);
+    lc->tci_states_configurations_list = NULL;
     free(list->items[i].candidate_cell_id);
     list->items[i].candidate_cell_id = NULL;
   }
@@ -930,6 +1583,10 @@ bool eq_f1ap_ltm_configuration_id_mapping_list(const f1ap_ltm_configuration_id_m
 
 void f1ap_ltm_free_information_setup(f1ap_ltm_information_setup_t *setup)
 {
+  if (!setup)
+    return;
+  f1ap_ltm_free_reference_configuration(setup->reference_configuration);
+  f1ap_ltm_free_csi_resource_configuration(setup->csi_resource_configuration);
   free(setup);
 }
 
@@ -938,7 +1595,9 @@ f1ap_ltm_information_setup_t *cp_f1ap_ltm_information_setup(const f1ap_ltm_infor
   if (!orig)
     return NULL;
   f1ap_ltm_information_setup_t *cp = calloc_or_fail(1, sizeof(*cp));
-  *cp = *orig;
+  cp->setup_indication = orig->setup_indication;
+  cp->reference_configuration = cp_f1ap_ltm_reference_configuration(orig->reference_configuration);
+  cp->csi_resource_configuration = cp_f1ap_ltm_csi_resource_configuration(orig->csi_resource_configuration);
   return cp;
 }
 
@@ -948,11 +1607,16 @@ bool eq_f1ap_ltm_information_setup(const f1ap_ltm_information_setup_t *a, const 
     return true;
   if (!a || !b)
     return false;
-  return a->setup_indication == b->setup_indication;
+  return a->setup_indication == b->setup_indication
+         && eq_f1ap_ltm_reference_configuration(a->reference_configuration, b->reference_configuration)
+         && eq_f1ap_ltm_csi_resource_configuration(a->csi_resource_configuration, b->csi_resource_configuration);
 }
 
 void f1ap_ltm_free_early_sync_information_request(f1ap_early_sync_information_request_t *req)
 {
+  if (!req)
+    return;
+  f1ap_ltm_free_gnb_du_ids_list(req->ltm_gnb_du_ids_list);
   free(req);
 }
 
@@ -962,7 +1626,8 @@ f1ap_early_sync_information_request_t *cp_f1ap_ltm_early_sync_information_reques
   if (!orig)
     return NULL;
   f1ap_early_sync_information_request_t *cp = calloc_or_fail(1, sizeof(*cp));
-  *cp = *orig;
+  cp->request_for_rach_configuration = orig->request_for_rach_configuration;
+  cp->ltm_gnb_du_ids_list = cp_f1ap_ltm_gnb_du_ids_list(orig->ltm_gnb_du_ids_list);
   return cp;
 }
 
@@ -973,7 +1638,255 @@ bool eq_f1ap_ltm_early_sync_information_request(const f1ap_early_sync_informatio
     return true;
   if (!a || !b)
     return false;
-  return a->request_for_rach_configuration == b->request_for_rach_configuration;
+  return a->request_for_rach_configuration == b->request_for_rach_configuration
+         && eq_f1ap_ltm_gnb_du_ids_list(a->ltm_gnb_du_ids_list, b->ltm_gnb_du_ids_list);
+}
+
+void f1ap_ltm_free_information_modify(f1ap_ltm_information_modify_t *mod)
+{
+  if (!mod)
+    return;
+  f1ap_ltm_free_reference_configuration(mod->reference_configuration);
+  f1ap_ltm_free_csi_resource_configuration(mod->csi_resource_configuration);
+  free(mod);
+}
+
+f1ap_ltm_information_modify_t *cp_f1ap_ltm_information_modify(const f1ap_ltm_information_modify_t *orig)
+{
+  if (!orig)
+    return NULL;
+  f1ap_ltm_information_modify_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->ltm_indicator = orig->ltm_indicator;
+  cp->reference_configuration = cp_f1ap_ltm_reference_configuration(orig->reference_configuration);
+  cp->csi_resource_configuration = cp_f1ap_ltm_csi_resource_configuration(orig->csi_resource_configuration);
+  return cp;
+}
+
+bool eq_f1ap_ltm_information_modify(const f1ap_ltm_information_modify_t *a, const f1ap_ltm_information_modify_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b)
+    return false;
+  return a->ltm_indicator == b->ltm_indicator
+         && eq_f1ap_ltm_reference_configuration(a->reference_configuration, b->reference_configuration)
+         && eq_f1ap_ltm_csi_resource_configuration(a->csi_resource_configuration, b->csi_resource_configuration);
+}
+
+void f1ap_ltm_free_cells_to_be_released_list(f1ap_ltm_cells_to_be_released_list_t *list)
+{
+  if (!list)
+    return;
+  free(list->cell_ids);
+  free(list);
+}
+
+f1ap_ltm_cells_to_be_released_list_t *cp_f1ap_ltm_cells_to_be_released_list(
+    const f1ap_ltm_cells_to_be_released_list_t *orig)
+{
+  if (!orig || orig->len == 0)
+    return NULL;
+  f1ap_ltm_cells_to_be_released_list_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->len = orig->len;
+  cp->cell_ids = calloc_or_fail(orig->len, sizeof(*cp->cell_ids));
+  memcpy(cp->cell_ids, orig->cell_ids, orig->len * sizeof(*cp->cell_ids));
+  return cp;
+}
+
+bool eq_f1ap_ltm_cells_to_be_released_list(const f1ap_ltm_cells_to_be_released_list_t *a,
+                                           const f1ap_ltm_cells_to_be_released_list_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b || a->len != b->len)
+    return false;
+  for (int i = 0; i < a->len; ++i) {
+    if (a->cell_ids[i] != b->cell_ids[i])
+      return false;
+  }
+  return true;
+}
+
+void f1ap_ltm_free_gnb_du_ids_list(f1ap_ltm_gnb_du_ids_list_t *list)
+{
+  if (!list)
+    return;
+  free(list->gnb_du_ids);
+  free(list);
+}
+
+f1ap_ltm_gnb_du_ids_list_t *cp_f1ap_ltm_gnb_du_ids_list(const f1ap_ltm_gnb_du_ids_list_t *orig)
+{
+  if (!orig || orig->len == 0)
+    return NULL;
+  f1ap_ltm_gnb_du_ids_list_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->len = orig->len;
+  cp->gnb_du_ids = calloc_or_fail(orig->len, sizeof(*cp->gnb_du_ids));
+  memcpy(cp->gnb_du_ids, orig->gnb_du_ids, orig->len * sizeof(*cp->gnb_du_ids));
+  return cp;
+}
+
+bool eq_f1ap_ltm_gnb_du_ids_list(const f1ap_ltm_gnb_du_ids_list_t *a, const f1ap_ltm_gnb_du_ids_list_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b || a->len != b->len)
+    return false;
+  for (int i = 0; i < a->len; ++i) {
+    if (a->gnb_du_ids[i] != b->gnb_du_ids[i])
+      return false;
+  }
+  return true;
+}
+
+void f1ap_ltm_free_cfra_resource_config_list(f1ap_ltm_cfra_resource_config_list_t *list)
+{
+  if (!list)
+    return;
+  for (int i = 0; i < list->len; ++i) {
+    FREE_OPT_BYTE_ARRAY(list->items[i].ltm_cfra_resource_configuration);
+    FREE_OPT_BYTE_ARRAY(list->items[i].ltm_cfra_resource_configuration_for_sul);
+  }
+  free(list->items);
+  free(list);
+}
+
+f1ap_ltm_cfra_resource_config_list_t *cp_f1ap_ltm_cfra_resource_config_list(
+    const f1ap_ltm_cfra_resource_config_list_t *orig)
+{
+  if (!orig || orig->len == 0)
+    return NULL;
+  f1ap_ltm_cfra_resource_config_list_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->len = orig->len;
+  cp->items = calloc_or_fail(orig->len, sizeof(*cp->items));
+  for (int i = 0; i < orig->len; ++i) {
+    cp->items[i].cell_id = orig->items[i].cell_id;
+    CP_OPT_BYTE_ARRAY(cp->items[i].ltm_cfra_resource_configuration, orig->items[i].ltm_cfra_resource_configuration);
+    CP_OPT_BYTE_ARRAY(cp->items[i].ltm_cfra_resource_configuration_for_sul,
+                      orig->items[i].ltm_cfra_resource_configuration_for_sul);
+  }
+  return cp;
+}
+
+bool eq_f1ap_ltm_cfra_resource_config_list(const f1ap_ltm_cfra_resource_config_list_t *a,
+                                           const f1ap_ltm_cfra_resource_config_list_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b || a->len != b->len)
+    return false;
+  for (int i = 0; i < a->len; ++i) {
+    if (a->items[i].cell_id != b->items[i].cell_id)
+      return false;
+    if (!ltm_eq_ba_ptr(a->items[i].ltm_cfra_resource_configuration, b->items[i].ltm_cfra_resource_configuration))
+      return false;
+    if (!ltm_eq_ba_ptr(a->items[i].ltm_cfra_resource_configuration_for_sul,
+                       b->items[i].ltm_cfra_resource_configuration_for_sul))
+      return false;
+  }
+  return true;
+}
+
+void f1ap_ltm_free_reset_information(f1ap_ltm_reset_information_t *info)
+{
+  if (!info)
+    return;
+  FREE_OPT_BYTE_ARRAY(info->configuration);
+  free(info);
+}
+
+f1ap_ltm_reset_information_t *cp_f1ap_ltm_reset_information(const f1ap_ltm_reset_information_t *orig)
+{
+  if (!orig)
+    return NULL;
+  f1ap_ltm_reset_information_t *cp = calloc_or_fail(1, sizeof(*cp));
+  CP_OPT_BYTE_ARRAY(cp->configuration, orig->configuration);
+  return cp;
+}
+
+bool eq_f1ap_ltm_reset_information(const f1ap_ltm_reset_information_t *a, const f1ap_ltm_reset_information_t *b)
+{
+  return ltm_eq_ba_ptr(a ? a->configuration : NULL, b ? b->configuration : NULL);
+}
+
+void f1ap_ltm_free_tci_states_configurations_list(f1ap_ltm_tci_states_configurations_list_t *list)
+{
+  if (!list)
+    return;
+  for (int i = 0; i < list->len; ++i) {
+    FREE_OPT_BYTE_ARRAY(list->items[i].tci_states_configurations_list);
+  }
+  free(list->items);
+  free(list);
+}
+
+f1ap_ltm_tci_states_configurations_list_t *cp_f1ap_ltm_tci_states_configurations_list(
+    const f1ap_ltm_tci_states_configurations_list_t *orig)
+{
+  if (!orig || orig->len == 0)
+    return NULL;
+  f1ap_ltm_tci_states_configurations_list_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->len = orig->len;
+  cp->items = calloc_or_fail(orig->len, sizeof(*cp->items));
+  for (int i = 0; i < orig->len; ++i) {
+    CP_OPT_BYTE_ARRAY(cp->items[i].tci_states_configurations_list, orig->items[i].tci_states_configurations_list);
+  }
+  return cp;
+}
+
+bool eq_f1ap_ltm_tci_states_configurations_list(const f1ap_ltm_tci_states_configurations_list_t *a,
+                                                const f1ap_ltm_tci_states_configurations_list_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b || a->len != b->len)
+    return false;
+  for (int i = 0; i < a->len; ++i) {
+    if (!ltm_eq_ba_ptr(a->items[i].tci_states_configurations_list, b->items[i].tci_states_configurations_list))
+      return false;
+  }
+  return true;
+}
+
+void f1ap_ltm_free_pc5_rlc_channels_to_be_released_list(f1ap_pc5_rlc_channel_to_be_released_list_t *list)
+{
+  if (!list)
+    return;
+  for (int i = 0; i < list->len; ++i)
+    free(list->items[i].remote_ue_local_id);
+  free(list->items);
+  free(list);
+}
+
+f1ap_pc5_rlc_channel_to_be_released_list_t *cp_f1ap_ltm_pc5_rlc_channels_to_be_released_list(
+    const f1ap_pc5_rlc_channel_to_be_released_list_t *orig)
+{
+  if (!orig || orig->len == 0)
+    return NULL;
+  f1ap_pc5_rlc_channel_to_be_released_list_t *cp = calloc_or_fail(1, sizeof(*cp));
+  cp->len = orig->len;
+  cp->items = calloc_or_fail(orig->len, sizeof(*cp->items));
+  for (int i = 0; i < orig->len; ++i) {
+    cp->items[i].pc5_rlc_channel_id = orig->items[i].pc5_rlc_channel_id;
+    if (orig->items[i].remote_ue_local_id)
+      _F1_MALLOC(cp->items[i].remote_ue_local_id, *orig->items[i].remote_ue_local_id);
+  }
+  return cp;
+}
+
+bool eq_f1ap_ltm_pc5_rlc_channels_to_be_released_list(const f1ap_pc5_rlc_channel_to_be_released_list_t *a,
+                                                      const f1ap_pc5_rlc_channel_to_be_released_list_t *b)
+{
+  if (!a && !b)
+    return true;
+  if (!a || !b || a->len != b->len)
+    return false;
+  for (int i = 0; i < a->len; ++i) {
+    if (a->items[i].pc5_rlc_channel_id != b->items[i].pc5_rlc_channel_id)
+      return false;
+    _F1_EQ_CHECK_OPTIONAL_IE(&a->items[i], &b->items[i], remote_ue_local_id, _F1_EQ_CHECK_INT);
+  }
+  return true;
 }
 
 void f1ap_ltm_free_early_ul_sync_configuration(f1ap_early_ul_sync_configuration_t *cfg)
@@ -1023,4 +1936,34 @@ void f1ap_ltm_free_ue_context_setup_resp_ltm(f1ap_ue_context_setup_resp_t *resp)
   resp->early_ul_sync_configuration = NULL;
   free(resp->requested_target_cell_id);
   resp->requested_target_cell_id = NULL;
+}
+
+void f1ap_ltm_free_ue_context_mod_req_ltm(f1ap_ue_context_mod_req_t *req)
+{
+  if (!req)
+    return;
+  f1ap_ltm_free_information_modify(req->ltm_information_modify);
+  req->ltm_information_modify = NULL;
+  f1ap_ltm_free_configuration_id_mapping_list(req->ltm_configuration_id_mapping_list);
+  req->ltm_configuration_id_mapping_list = NULL;
+  f1ap_ltm_free_cells_to_be_released_list(req->ltm_cells_to_be_released_list);
+  req->ltm_cells_to_be_released_list = NULL;
+  f1ap_ltm_free_early_sync_information_request(req->early_sync_information_request);
+  req->early_sync_information_request = NULL;
+  f1ap_ltm_free_cfra_resource_config_list(req->ltm_cfra_resource_config_list);
+  req->ltm_cfra_resource_config_list = NULL;
+  f1ap_ltm_free_reset_information(req->ltm_reset_information);
+  req->ltm_reset_information = NULL;
+  f1ap_ltm_free_tci_states_configurations_list(req->ltm_tci_states_configurations_list);
+  req->ltm_tci_states_configurations_list = NULL;
+  f1ap_ltm_free_pc5_rlc_channels_to_be_released_list(req->pc5_rlc_channels_to_be_released_list);
+  req->pc5_rlc_channels_to_be_released_list = NULL;
+}
+
+void f1ap_ltm_free_ue_context_mod_resp_ltm(f1ap_ue_context_mod_resp_t *resp)
+{
+  if (!resp)
+    return;
+  f1ap_ltm_free_ltm_configuration(resp->ltm_configuration);
+  resp->ltm_configuration = NULL;
 }

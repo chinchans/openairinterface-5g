@@ -57,6 +57,7 @@ int DU_handle_UE_CONTEXT_SETUP_REQUEST(instance_t instance, sctp_assoc_t assoc_i
 
 int DU_send_UE_CONTEXT_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_ue_context_setup_resp_t *resp)
 {
+  /* Inter-gNB-DU LTM handover: LTMConfiguration / RequestedTargetCellID encoded via wire codec. */
   F1AP_F1AP_PDU_t *pdu = encode_ue_context_setup_resp(resp);
 
   uint8_t *buffer = NULL;
