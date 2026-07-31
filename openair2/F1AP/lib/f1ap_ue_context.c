@@ -1226,8 +1226,7 @@ F1AP_F1AP_PDU_t *encode_ue_context_setup_req(const f1ap_ue_context_setup_req_t *
     asn_long2INTEGER(&ie->value.choice.BitRate, *req->gnb_du_ue_agg_mbr_ul);
   }
 
-  /* optional: LTMInformation-Setup, LTMConfigurationIDMappingList (TS 38.473 9.2.2.1)
-   * via internal wire codec in ResourceCoordinationTransferContainer (ASN.1 gap) */
+  /* optional: LTM IEs via internal wire codec in ResourceCoordinationTransferContainer */
   byte_array_t *ltm_wire = f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(req);
   if (ltm_wire) {
     asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextSetupRequestIEs_t, ie);
@@ -1495,8 +1494,7 @@ F1AP_F1AP_PDU_t *encode_ue_context_setup_resp(const f1ap_ue_context_setup_resp_t
     ie11->value.choice.SRBs_Setup_List = encode_srbs_setup(msg->srbs_len, msg->srbs);
   }
 
-  /* optional: LTMConfiguration, RequestedTargetCellID (TS 38.473 9.2.2.2)
-   * via internal wire codec in ResourceCoordinationTransferContainer (ASN.1 gap) */
+  /* optional: LTM IEs via internal wire codec in ResourceCoordinationTransferContainer */
   byte_array_t *ltm_wire = f1ap_ltm_wire_encode_ue_ctx_setup_resp_ltm(msg);
   if (ltm_wire) {
     asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextSetupResponseIEs_t, ie);
@@ -1785,24 +1783,6 @@ F1AP_F1AP_PDU_t *encode_ue_context_mod_req(const f1ap_ue_context_mod_req_t *req)
                                                             ? F1AP_LowerLayerPresenceStatusChange_suspend_lower_layers
                                                             : F1AP_LowerLayerPresenceStatusChange_resume_lower_layers;
   }
-
-  /* optional: LTMInformationModify, LTMConfigurationIDMappingList, LTMCellsToBeReleasedList,
-   * EarlySyncInformationRequest, LTMCFRAResourceConfigList, LTMResetInformation,
-   * LTMTCIStatesConfigurationsList, PC5 RLC channels to be released (TS 38.473 9.2.2.7)
-   * via internal wire codec in ResourceCoordinationTransferContainer (ASN.1 gap) */
-  byte_array_t *ltm_wire = f1ap_ltm_wire_encode_ue_ctx_mod_req_ltm(req);
-  if (ltm_wire) {
-    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextModificationRequestIEs_t, ie_ltm);
-    ie_ltm->id = F1AP_ProtocolIE_ID_id_ResourceCoordinationTransferContainer;
-    ie_ltm->criticality = F1AP_Criticality_ignore;
-    ie_ltm->value.present = F1AP_UEContextModificationRequestIEs__value_PR_ResourceCoordinationTransferContainer;
-    OCTET_STRING_fromBuf(&ie_ltm->value.choice.ResourceCoordinationTransferContainer,
-                         (const char *)ltm_wire->buf,
-                         ltm_wire->len);
-    free_byte_array(*ltm_wire);
-    free(ltm_wire);
-  }
-
   return pdu;
 }
 
@@ -1895,14 +1875,6 @@ bool decode_ue_context_mod_req(const F1AP_F1AP_PDU_t *pdu, f1ap_ue_context_mod_r
           _F1_MALLOC(out->status, v);
         }
         break;
-      case F1AP_ProtocolIE_ID_id_ResourceCoordinationTransferContainer: {
-        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextModificationRequestIEs__value_PR_ResourceCoordinationTransferContainer);
-        OCTET_STRING_t *os = &ie->value.choice.ResourceCoordinationTransferContainer;
-        byte_array_t ba = {.len = os->size, .buf = os->buf};
-        if (f1ap_ltm_wire_is_ltm_container(&ba)) {
-          _F1_CHECK_EXP(f1ap_ltm_wire_decode_ue_ctx_mod_req_ltm(&ba, out));
-        }
-        } break;
       default:
         PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
         break;
@@ -1968,23 +1940,6 @@ f1ap_ue_context_mod_req_t cp_ue_context_mod_req(const f1ap_ue_context_mod_req_t 
   }
   if (orig->status)
     _F1_MALLOC(cp.status, *orig->status);
-  if (orig->ltm_information_modify)
-    cp.ltm_information_modify = cp_f1ap_ltm_information_modify(orig->ltm_information_modify);
-  if (orig->ltm_configuration_id_mapping_list)
-    cp.ltm_configuration_id_mapping_list = cp_f1ap_ltm_configuration_id_mapping_list(orig->ltm_configuration_id_mapping_list);
-  if (orig->ltm_cells_to_be_released_list)
-    cp.ltm_cells_to_be_released_list = cp_f1ap_ltm_cells_to_be_released_list(orig->ltm_cells_to_be_released_list);
-  if (orig->early_sync_information_request)
-    cp.early_sync_information_request = cp_f1ap_ltm_early_sync_information_request(orig->early_sync_information_request);
-  if (orig->ltm_cfra_resource_config_list)
-    cp.ltm_cfra_resource_config_list = cp_f1ap_ltm_cfra_resource_config_list(orig->ltm_cfra_resource_config_list);
-  if (orig->ltm_reset_information)
-    cp.ltm_reset_information = cp_f1ap_ltm_reset_information(orig->ltm_reset_information);
-  if (orig->ltm_tci_states_configurations_list)
-    cp.ltm_tci_states_configurations_list = cp_f1ap_ltm_tci_states_configurations_list(orig->ltm_tci_states_configurations_list);
-  if (orig->pc5_rlc_channels_to_be_released_list)
-    cp.pc5_rlc_channels_to_be_released_list =
-        cp_f1ap_ltm_pc5_rlc_channels_to_be_released_list(orig->pc5_rlc_channels_to_be_released_list);
   return cp;
 }
 
@@ -2021,24 +1976,6 @@ bool eq_ue_context_mod_req(const f1ap_ue_context_mod_req_t *a, const f1ap_ue_con
     _F1_CHECK_EXP(eq_drb_to_release(&a->drbs_rel[i], &b->drbs_rel[i]));
 
   _F1_EQ_CHECK_OPTIONAL_IE(a, b, status, _F1_EQ_CHECK_INT);
-  _F1_CHECK_EXP((a->ltm_information_modify && b->ltm_information_modify)
-                || (!a->ltm_information_modify && !b->ltm_information_modify));
-  _F1_CHECK_EXP(!a->ltm_information_modify
-                || eq_f1ap_ltm_information_modify(a->ltm_information_modify, b->ltm_information_modify));
-  _F1_CHECK_EXP(eq_f1ap_ltm_configuration_id_mapping_list(a->ltm_configuration_id_mapping_list,
-                                                          b->ltm_configuration_id_mapping_list));
-  _F1_CHECK_EXP(eq_f1ap_ltm_cells_to_be_released_list(a->ltm_cells_to_be_released_list, b->ltm_cells_to_be_released_list));
-  _F1_CHECK_EXP((a->early_sync_information_request && b->early_sync_information_request)
-                || (!a->early_sync_information_request && !b->early_sync_information_request));
-  _F1_CHECK_EXP(!a->early_sync_information_request
-                || eq_f1ap_ltm_early_sync_information_request(a->early_sync_information_request,
-                                                              b->early_sync_information_request));
-  _F1_CHECK_EXP(eq_f1ap_ltm_cfra_resource_config_list(a->ltm_cfra_resource_config_list, b->ltm_cfra_resource_config_list));
-  _F1_CHECK_EXP(eq_f1ap_ltm_reset_information(a->ltm_reset_information, b->ltm_reset_information));
-  _F1_CHECK_EXP(eq_f1ap_ltm_tci_states_configurations_list(a->ltm_tci_states_configurations_list,
-                                                           b->ltm_tci_states_configurations_list));
-  _F1_CHECK_EXP(eq_f1ap_ltm_pc5_rlc_channels_to_be_released_list(a->pc5_rlc_channels_to_be_released_list,
-                                                                 b->pc5_rlc_channels_to_be_released_list));
   return true;
 }
 
@@ -2066,7 +2003,6 @@ void free_ue_context_mod_req(f1ap_ue_context_mod_req_t *req)
     free_drb_to_release(&req->drbs_rel[i]);
   free(req->drbs_rel);
   free(req->status);
-  f1ap_ltm_free_ue_context_mod_req_ltm(req);
 }
 
 /**
@@ -2124,21 +2060,6 @@ F1AP_F1AP_PDU_t *encode_ue_context_mod_resp(const f1ap_ue_context_mod_resp_t *ms
     ie12->value.choice.SRBs_SetupMod_List = encode_srbs_setupmod(msg->srbs_len, msg->srbs);
   }
 
-  /* optional: LTMConfiguration (TS 38.473 9.2.2.8)
-   * via internal wire codec in ResourceCoordinationTransferContainer (ASN.1 gap) */
-  byte_array_t *ltm_wire = f1ap_ltm_wire_encode_ue_ctx_mod_resp_ltm(msg);
-  if (ltm_wire) {
-    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextModificationResponseIEs_t, ie_ltm);
-    ie_ltm->id = F1AP_ProtocolIE_ID_id_ResourceCoordinationTransferContainer;
-    ie_ltm->criticality = F1AP_Criticality_ignore;
-    ie_ltm->value.present = F1AP_UEContextModificationResponseIEs__value_PR_ResourceCoordinationTransferContainer;
-    OCTET_STRING_fromBuf(&ie_ltm->value.choice.ResourceCoordinationTransferContainer,
-                         (const char *)ltm_wire->buf,
-                         ltm_wire->len);
-    free_byte_array(*ltm_wire);
-    free(ltm_wire);
-  }
-
   return pdu;
 }
 
@@ -2181,14 +2102,6 @@ bool decode_ue_context_mod_resp(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context
         _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextModificationResponseIEs__value_PR_SRBs_SetupMod_List);
         _F1_CHECK_EXP(decode_srbs_setupmod(&ie->value.choice.SRBs_SetupMod_List, &out->srbs_len, &out->srbs));
         break;
-      case F1AP_ProtocolIE_ID_id_ResourceCoordinationTransferContainer: {
-        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextModificationResponseIEs__value_PR_ResourceCoordinationTransferContainer);
-        OCTET_STRING_t *os = &ie->value.choice.ResourceCoordinationTransferContainer;
-        byte_array_t ba = {.len = os->size, .buf = os->buf};
-        if (f1ap_ltm_wire_is_ltm_container(&ba)) {
-          _F1_CHECK_EXP(f1ap_ltm_wire_decode_ue_ctx_mod_resp_ltm(&ba, out));
-        }
-        } break;
       default:
         PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
         break;
@@ -2234,9 +2147,6 @@ f1ap_ue_context_mod_resp_t cp_ue_context_mod_resp(const f1ap_ue_context_mod_resp
       cp.srbs[i] = cp_srb_setup(&orig->srbs[i]);
   }
 
-  if (orig->ltm_configuration)
-    cp.ltm_configuration = cp_f1ap_ltm_ltm_configuration(orig->ltm_configuration);
-
   return cp;
 }
 
@@ -2260,8 +2170,6 @@ bool eq_ue_context_mod_resp(const f1ap_ue_context_mod_resp_t *a, const f1ap_ue_c
   for (int i = 0; i < a->srbs_len; ++i)
     _F1_CHECK_EXP(eq_srb_setup(&a->srbs[i], &b->srbs[i]));
 
-  _F1_CHECK_EXP(eq_f1ap_ltm_ltm_configuration(a->ltm_configuration, b->ltm_configuration));
-
   return true;
 }
 
@@ -2279,7 +2187,6 @@ void free_ue_context_mod_resp(f1ap_ue_context_mod_resp_t *resp)
   for (int i = 0; i < resp->srbs_len; ++i)
     free_srb_setup(&resp->srbs[i]);
   free(resp->srbs);
-  f1ap_ltm_free_ue_context_mod_resp_ltm(resp);
 }
 
 /*

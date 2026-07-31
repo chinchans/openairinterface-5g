@@ -995,11 +995,6 @@ static void test_f1ap_ue_context_setup_request_ltm(void)
 
   f1ap_ltm_information_setup_t *ltm_setup = calloc_or_fail(1, sizeof(*ltm_setup));
   ltm_setup->setup_indication = 1;
-  ltm_setup->reference_configuration = calloc_or_fail(1, sizeof(*ltm_setup->reference_configuration));
-  ltm_setup->reference_configuration->request_for_lower_layer_configuration_present = true;
-  ltm_setup->reference_configuration->request_for_lower_layer_configuration = true;
-  ltm_setup->csi_resource_configuration = calloc_or_fail(1, sizeof(*ltm_setup->csi_resource_configuration));
-  ltm_setup->csi_resource_configuration->configuration = get_malloced_test_ba("LTM SETUP CSI CFG");
   orig.ltm_information_setup = ltm_setup;
 
   f1ap_ltm_configuration_id_mapping_list_t *mapping_list = calloc_or_fail(1, sizeof(*mapping_list));
@@ -1024,11 +1019,6 @@ static void test_f1ap_ue_context_setup_request_ltm(void)
 
   f1ap_early_sync_information_request_t *early_sync_req = calloc_or_fail(1, sizeof(*early_sync_req));
   early_sync_req->request_for_rach_configuration = true;
-  early_sync_req->ltm_gnb_du_ids_list = calloc_or_fail(1, sizeof(*early_sync_req->ltm_gnb_du_ids_list));
-  early_sync_req->ltm_gnb_du_ids_list->len = 2;
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids = calloc_or_fail(2, sizeof(*early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids));
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids[0] = 1001;
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids[1] = 1002;
   orig.early_sync_information_request = early_sync_req;
 
   F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_req(&orig);
@@ -1057,11 +1047,6 @@ static void test_f1ap_ue_context_setup_response_ltm(void)
   };
 
   f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
-  ltm_cfg->ssb_information = get_malloced_test_ba("LTM SSB INFO");
-  ltm_cfg->complete_candidate_configuration_indicator_present = true;
-  ltm_cfg->complete_candidate_configuration_indicator = true;
-  ltm_cfg->ltm_cfra_resource_configuration = get_malloced_test_ba("LTM CFRA CFG");
-  ltm_cfg->ltm_cfra_resource_configuration_for_sul = get_malloced_test_ba("LTM CFRA SUL CFG");
   f1ap_reference_configuration_t *ref_cfg = calloc_or_fail(1, sizeof(*ref_cfg));
   ref_cfg->request_for_lower_layer_configuration_present = true;
   ref_cfg->request_for_lower_layer_configuration = false;
@@ -1069,13 +1054,6 @@ static void test_f1ap_ue_context_setup_response_ltm(void)
   ref_cfg->reference_configuration_information->cellGroupConfig = get_malloced_test_ba("LTM RESP CELL GROUP");
   ref_cfg->reference_configuration_information->measurementTimingConfiguration = get_malloced_test_ba("LTM RESP MTC");
   ltm_cfg->reference_configuration = ref_cfg;
-  ltm_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ltm_cfg->reference_configuration_information));
-  *ltm_cfg->reference_configuration_information =
-      cp_f1ap_ltm_reference_configuration_information(ref_cfg->reference_configuration_information);
-  ltm_cfg->tci_states_configurations_list = calloc_or_fail(1, sizeof(*ltm_cfg->tci_states_configurations_list));
-  ltm_cfg->tci_states_configurations_list->len = 1;
-  ltm_cfg->tci_states_configurations_list->items = calloc_or_fail(1, sizeof(*ltm_cfg->tci_states_configurations_list->items));
-  ltm_cfg->tci_states_configurations_list->items[0].tci_states_configurations_list = get_malloced_test_ba("LTM TCI STATES");
   orig.ltm_configuration = ltm_cfg;
 
   f1ap_early_ul_sync_configuration_t *early_ul = calloc_or_fail(1, sizeof(*early_ul));
@@ -1213,97 +1191,6 @@ static void test_f1ap_ue_context_modification_request_simple()
   printf("%s() successful\n", __func__);
 }
 
-static void test_f1ap_ue_context_modification_request_ltm(void)
-{
-  f1ap_ue_context_mod_req_t orig = {
-      .gNB_CU_ue_id = 3333,
-      .gNB_DU_ue_id = 4444,
-  };
-
-  f1ap_ltm_information_modify_t *ltm_mod = calloc_or_fail(1, sizeof(*ltm_mod));
-  ltm_mod->ltm_indicator = 1;
-  ltm_mod->reference_configuration = calloc_or_fail(1, sizeof(*ltm_mod->reference_configuration));
-  ltm_mod->reference_configuration->request_for_lower_layer_configuration_present = true;
-  ltm_mod->reference_configuration->request_for_lower_layer_configuration = true;
-  ltm_mod->reference_configuration->reference_configuration_information = calloc_or_fail(1, sizeof(*ltm_mod->reference_configuration->reference_configuration_information));
-  ltm_mod->reference_configuration->reference_configuration_information->cellGroupConfig = get_malloced_test_ba("LTM MOD CELL GROUP");
-  ltm_mod->reference_configuration->reference_configuration_information->measurementTimingConfiguration = get_malloced_test_ba("LTM MOD MTC");
-  ltm_mod->csi_resource_configuration = calloc_or_fail(1, sizeof(*ltm_mod->csi_resource_configuration));
-  ltm_mod->csi_resource_configuration->configuration = get_malloced_test_ba("LTM MOD CSI CFG");
-  orig.ltm_information_modify = ltm_mod;
-
-  f1ap_ltm_configuration_id_mapping_list_t *mapping_list = calloc_or_fail(1, sizeof(*mapping_list));
-  mapping_list->len = 1;
-  mapping_list->items = calloc_or_fail(1, sizeof(*mapping_list->items));
-  mapping_list->items[0].ltm_configuration_id = 3;
-  _F1_MALLOC(mapping_list->items[0].candidate_cell_id, 0x123456789ULL);
-  mapping_list->items[0].ltm_configuration.ssb_information = get_malloced_test_ba("LTM MOD MAPPING SSB");
-  orig.ltm_configuration_id_mapping_list = mapping_list;
-
-  f1ap_ltm_cells_to_be_released_list_t *cells_rel = calloc_or_fail(1, sizeof(*cells_rel));
-  cells_rel->len = 2;
-  cells_rel->cell_ids = calloc_or_fail(2, sizeof(*cells_rel->cell_ids));
-  cells_rel->cell_ids[0] = 0xAAA000001ULL;
-  cells_rel->cell_ids[1] = 0xBBB000002ULL;
-  orig.ltm_cells_to_be_released_list = cells_rel;
-
-  f1ap_early_sync_information_request_t *early_sync_req = calloc_or_fail(1, sizeof(*early_sync_req));
-  early_sync_req->request_for_rach_configuration = true;
-  early_sync_req->ltm_gnb_du_ids_list = calloc_or_fail(1, sizeof(*early_sync_req->ltm_gnb_du_ids_list));
-  early_sync_req->ltm_gnb_du_ids_list->len = 2;
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids = calloc_or_fail(2, sizeof(*early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids));
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids[0] = 2001;
-  early_sync_req->ltm_gnb_du_ids_list->gnb_du_ids[1] = 2002;
-  orig.early_sync_information_request = early_sync_req;
-
-  f1ap_ltm_cfra_resource_config_list_t *cfra_list = calloc_or_fail(1, sizeof(*cfra_list));
-  cfra_list->len = 1;
-  cfra_list->items = calloc_or_fail(1, sizeof(*cfra_list->items));
-  cfra_list->items[0].cell_id = 0xCCC000003ULL;
-  cfra_list->items[0].ltm_cfra_resource_configuration = get_malloced_test_ba("LTM MOD CFRA CFG");
-  cfra_list->items[0].ltm_cfra_resource_configuration_for_sul = get_malloced_test_ba("LTM MOD CFRA SUL CFG");
-  orig.ltm_cfra_resource_config_list = cfra_list;
-
-  f1ap_ltm_reset_information_t *reset_info = calloc_or_fail(1, sizeof(*reset_info));
-  reset_info->configuration = get_malloced_test_ba("LTM MOD RESET INFO");
-  orig.ltm_reset_information = reset_info;
-
-  f1ap_ltm_tci_states_configurations_list_t *tci_list = calloc_or_fail(1, sizeof(*tci_list));
-  tci_list->len = 1;
-  tci_list->items = calloc_or_fail(1, sizeof(*tci_list->items));
-  tci_list->items[0].tci_states_configurations_list = get_malloced_test_ba("LTM MOD TCI STATES");
-  orig.ltm_tci_states_configurations_list = tci_list;
-
-  f1ap_pc5_rlc_channel_to_be_released_list_t *pc5_list = calloc_or_fail(1, sizeof(*pc5_list));
-  pc5_list->len = 2;
-  pc5_list->items = calloc_or_fail(2, sizeof(*pc5_list->items));
-  pc5_list->items[0].pc5_rlc_channel_id = 10;
-  pc5_list->items[1].pc5_rlc_channel_id = 11;
-  _F1_MALLOC(pc5_list->items[1].remote_ue_local_id, 42);
-  orig.pc5_rlc_channels_to_be_released_list = pc5_list;
-
-  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_mod_req(&orig);
-  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
-  f1ap_msg_free(f1enc);
-
-  f1ap_ue_context_mod_req_t decoded = {0};
-  bool ret = decode_ue_context_mod_req(f1dec, &decoded);
-  AssertFatal(ret, "decode_ue_context_mod_req(): could not decode LTM message\n");
-  f1ap_msg_free(f1dec);
-
-  ret = eq_ue_context_mod_req(&orig, &decoded);
-  AssertFatal(ret, "eq_ue_context_mod_req(): LTM decoded message doesn't match\n");
-  free_ue_context_mod_req(&decoded);
-
-  f1ap_ue_context_mod_req_t cp = cp_ue_context_mod_req(&orig);
-  ret = eq_ue_context_mod_req(&orig, &cp);
-  AssertFatal(ret, "eq_ue_context_mod_req(): LTM copied message doesn't match\n");
-  free_ue_context_mod_req(&orig);
-  free_ue_context_mod_req(&cp);
-
-  printf("%s() successful\n", __func__);
-}
-
 static void test_f1ap_ue_context_modification_response()
 {
   f1ap_ue_context_mod_resp_t orig = {
@@ -1380,50 +1267,6 @@ static void test_f1ap_ue_context_modification_response_simple()
   f1ap_ue_context_mod_resp_t cp = cp_ue_context_mod_resp(&orig);
   ret = eq_ue_context_mod_resp(&orig, &cp);
   AssertFatal(ret, "eq_ue_context_mod_resp(): copied message doesn't match\n");
-  free_ue_context_mod_resp(&orig);
-  free_ue_context_mod_resp(&cp);
-
-  printf("%s() successful\n", __func__);
-}
-
-static void test_f1ap_ue_context_modification_response_ltm(void)
-{
-  f1ap_ue_context_mod_resp_t orig = {
-      .gNB_CU_ue_id = 5555,
-      .gNB_DU_ue_id = 6666,
-  };
-
-  f1ap_ltm_configuration_t *ltm_cfg = calloc_or_fail(1, sizeof(*ltm_cfg));
-  ltm_cfg->ssb_information = get_malloced_test_ba("LTM MOD RESP SSB INFO");
-  ltm_cfg->complete_candidate_configuration_indicator_present = true;
-  ltm_cfg->complete_candidate_configuration_indicator = true;
-  ltm_cfg->reference_configuration_information = calloc_or_fail(1, sizeof(*ltm_cfg->reference_configuration_information));
-  ltm_cfg->reference_configuration_information->cellGroupConfig = get_malloced_test_ba("LTM MOD RESP CELL GROUP");
-  ltm_cfg->reference_configuration_information->measurementTimingConfiguration = get_malloced_test_ba("LTM MOD RESP MTC");
-  ltm_cfg->ltm_cfra_resource_configuration = get_malloced_test_ba("LTM MOD RESP CFRA CFG");
-  ltm_cfg->ltm_cfra_resource_configuration_for_sul = get_malloced_test_ba("LTM MOD RESP CFRA SUL CFG");
-  ltm_cfg->tci_states_configurations_list = calloc_or_fail(1, sizeof(*ltm_cfg->tci_states_configurations_list));
-  ltm_cfg->tci_states_configurations_list->len = 1;
-  ltm_cfg->tci_states_configurations_list->items = calloc_or_fail(1, sizeof(*ltm_cfg->tci_states_configurations_list->items));
-  ltm_cfg->tci_states_configurations_list->items[0].tci_states_configurations_list = get_malloced_test_ba("LTM MOD RESP TCI STATES");
-  orig.ltm_configuration = ltm_cfg;
-
-  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_mod_resp(&orig);
-  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
-  f1ap_msg_free(f1enc);
-
-  f1ap_ue_context_mod_resp_t decoded = {0};
-  bool ret = decode_ue_context_mod_resp(f1dec, &decoded);
-  AssertFatal(ret, "decode_ue_context_mod_resp(): could not decode LTM message\n");
-  f1ap_msg_free(f1dec);
-
-  ret = eq_ue_context_mod_resp(&orig, &decoded);
-  AssertFatal(ret, "eq_ue_context_mod_resp(): LTM decoded message doesn't match\n");
-  free_ue_context_mod_resp(&decoded);
-
-  f1ap_ue_context_mod_resp_t cp = cp_ue_context_mod_resp(&orig);
-  ret = eq_ue_context_mod_resp(&orig, &cp);
-  AssertFatal(ret, "eq_ue_context_mod_resp(): LTM copied message doesn't match\n");
   free_ue_context_mod_resp(&orig);
   free_ue_context_mod_resp(&cp);
 
@@ -1548,10 +1391,8 @@ int main()
   test_f1ap_ue_context_setup_response_ltm();
   test_f1ap_ue_context_modification_request();
   test_f1ap_ue_context_modification_request_simple();
-  test_f1ap_ue_context_modification_request_ltm();
   test_f1ap_ue_context_modification_response();
   test_f1ap_ue_context_modification_response_simple();
-  test_f1ap_ue_context_modification_response_ltm();
   test_f1ap_ue_context_release_request();
   test_f1ap_ue_context_release_command();
   test_f1ap_ue_context_release_complete();

@@ -36,22 +36,12 @@
 #define F1AP_LTM_WIRE_TAG_EARLY_UL_SYNC_CONFIGURATION 4
 #define F1AP_LTM_WIRE_TAG_REQUESTED_TARGET_CELL_ID 5
 #define F1AP_LTM_WIRE_TAG_EARLY_SYNC_INFORMATION_REQUEST 6
-#define F1AP_LTM_WIRE_TAG_INFORMATION_MODIFY 7
-#define F1AP_LTM_WIRE_TAG_LTM_CELLS_TO_BE_RELEASED_LIST 8
-#define F1AP_LTM_WIRE_TAG_LTM_CFRA_RESOURCE_CONFIG_LIST 9
-#define F1AP_LTM_WIRE_TAG_LTM_RESET_INFORMATION 10
-#define F1AP_LTM_WIRE_TAG_LTM_TCI_STATES_CONFIGURATIONS_LIST 11
-#define F1AP_LTM_WIRE_TAG_PC5_RLC_CHANNELS_TO_BE_RELEASED_LIST 12
 
 bool f1ap_ltm_wire_is_ltm_container(const byte_array_t *ba);
 byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_req_ltm(const f1ap_ue_context_setup_req_t *req);
 bool f1ap_ltm_wire_decode_ue_ctx_setup_req_ltm(const byte_array_t *ba, f1ap_ue_context_setup_req_t *req);
 byte_array_t *f1ap_ltm_wire_encode_ue_ctx_setup_resp_ltm(const f1ap_ue_context_setup_resp_t *resp);
 bool f1ap_ltm_wire_decode_ue_ctx_setup_resp_ltm(const byte_array_t *ba, f1ap_ue_context_setup_resp_t *resp);
-byte_array_t *f1ap_ltm_wire_encode_ue_ctx_mod_req_ltm(const f1ap_ue_context_mod_req_t *req);
-bool f1ap_ltm_wire_decode_ue_ctx_mod_req_ltm(const byte_array_t *ba, f1ap_ue_context_mod_req_t *req);
-byte_array_t *f1ap_ltm_wire_encode_ue_ctx_mod_resp_ltm(const f1ap_ue_context_mod_resp_t *resp);
-bool f1ap_ltm_wire_decode_ue_ctx_mod_resp_ltm(const byte_array_t *ba, f1ap_ue_context_mod_resp_t *resp);
 
 void f1ap_ltm_free_reference_configuration_information(f1ap_reference_configuration_information_t *rci);
 f1ap_reference_configuration_information_t cp_f1ap_ltm_reference_configuration_information(
@@ -89,42 +79,6 @@ f1ap_early_sync_information_request_t *cp_f1ap_ltm_early_sync_information_reques
 bool eq_f1ap_ltm_early_sync_information_request(const f1ap_early_sync_information_request_t *a,
                                                 const f1ap_early_sync_information_request_t *b);
 
-void f1ap_ltm_free_information_modify(f1ap_ltm_information_modify_t *mod);
-f1ap_ltm_information_modify_t *cp_f1ap_ltm_information_modify(const f1ap_ltm_information_modify_t *orig);
-bool eq_f1ap_ltm_information_modify(const f1ap_ltm_information_modify_t *a, const f1ap_ltm_information_modify_t *b);
-
-void f1ap_ltm_free_cells_to_be_released_list(f1ap_ltm_cells_to_be_released_list_t *list);
-f1ap_ltm_cells_to_be_released_list_t *cp_f1ap_ltm_cells_to_be_released_list(
-    const f1ap_ltm_cells_to_be_released_list_t *orig);
-bool eq_f1ap_ltm_cells_to_be_released_list(const f1ap_ltm_cells_to_be_released_list_t *a,
-                                             const f1ap_ltm_cells_to_be_released_list_t *b);
-
-void f1ap_ltm_free_gnb_du_ids_list(f1ap_ltm_gnb_du_ids_list_t *list);
-f1ap_ltm_gnb_du_ids_list_t *cp_f1ap_ltm_gnb_du_ids_list(const f1ap_ltm_gnb_du_ids_list_t *orig);
-bool eq_f1ap_ltm_gnb_du_ids_list(const f1ap_ltm_gnb_du_ids_list_t *a, const f1ap_ltm_gnb_du_ids_list_t *b);
-
-void f1ap_ltm_free_cfra_resource_config_list(f1ap_ltm_cfra_resource_config_list_t *list);
-f1ap_ltm_cfra_resource_config_list_t *cp_f1ap_ltm_cfra_resource_config_list(
-    const f1ap_ltm_cfra_resource_config_list_t *orig);
-bool eq_f1ap_ltm_cfra_resource_config_list(const f1ap_ltm_cfra_resource_config_list_t *a,
-                                           const f1ap_ltm_cfra_resource_config_list_t *b);
-
-void f1ap_ltm_free_reset_information(f1ap_ltm_reset_information_t *info);
-f1ap_ltm_reset_information_t *cp_f1ap_ltm_reset_information(const f1ap_ltm_reset_information_t *orig);
-bool eq_f1ap_ltm_reset_information(const f1ap_ltm_reset_information_t *a, const f1ap_ltm_reset_information_t *b);
-
-void f1ap_ltm_free_tci_states_configurations_list(f1ap_ltm_tci_states_configurations_list_t *list);
-f1ap_ltm_tci_states_configurations_list_t *cp_f1ap_ltm_tci_states_configurations_list(
-    const f1ap_ltm_tci_states_configurations_list_t *orig);
-bool eq_f1ap_ltm_tci_states_configurations_list(const f1ap_ltm_tci_states_configurations_list_t *a,
-                                                const f1ap_ltm_tci_states_configurations_list_t *b);
-
-void f1ap_ltm_free_pc5_rlc_channels_to_be_released_list(f1ap_pc5_rlc_channel_to_be_released_list_t *list);
-f1ap_pc5_rlc_channel_to_be_released_list_t *cp_f1ap_ltm_pc5_rlc_channels_to_be_released_list(
-    const f1ap_pc5_rlc_channel_to_be_released_list_t *orig);
-bool eq_f1ap_ltm_pc5_rlc_channels_to_be_released_list(const f1ap_pc5_rlc_channel_to_be_released_list_t *a,
-                                                      const f1ap_pc5_rlc_channel_to_be_released_list_t *b);
-
 void f1ap_ltm_free_early_ul_sync_configuration(f1ap_early_ul_sync_configuration_t *cfg);
 f1ap_early_ul_sync_configuration_t *cp_f1ap_ltm_early_ul_sync_configuration(const f1ap_early_ul_sync_configuration_t *orig);
 bool eq_f1ap_ltm_early_ul_sync_configuration(const f1ap_early_ul_sync_configuration_t *a,
@@ -132,7 +86,5 @@ bool eq_f1ap_ltm_early_ul_sync_configuration(const f1ap_early_ul_sync_configurat
 
 void f1ap_ltm_free_ue_context_setup_req_ltm(f1ap_ue_context_setup_req_t *req);
 void f1ap_ltm_free_ue_context_setup_resp_ltm(f1ap_ue_context_setup_resp_t *resp);
-void f1ap_ltm_free_ue_context_mod_req_ltm(f1ap_ue_context_mod_req_t *req);
-void f1ap_ltm_free_ue_context_mod_resp_ltm(f1ap_ue_context_mod_resp_t *resp);
 
 #endif /* F1AP_LTM_WIRE_CODEC_H_ */

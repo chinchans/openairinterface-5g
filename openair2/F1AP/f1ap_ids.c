@@ -20,11 +20,7 @@
  */
 
 /* "standalone" module to store a "secondary" UE ID for each UE in DU/CU.
- * Separate from the rest of F1, as it is also relevant for monolithic.
- *
- * Inter-gNB-DU LTM handover uses F1AP UE Context Setup (procedure code
- * F1AP_ProcedureCode_id_UEContextSetup). Rel-18 LTM Protocol IE IDs are
- * defined in f1ap_messages_types.h (F1AP_IE_ID_LTM_*). */
+ * Separate from the rest of F1, as it is also relevant for monolithic. */
 
 #include "f1ap_ids.h"
 

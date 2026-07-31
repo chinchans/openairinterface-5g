@@ -501,29 +501,8 @@ typedef struct f1ap_drb_to_release_t {
   int id;
 } f1ap_drb_to_release_t;
 
-/* Rel-18 LTM IEs (internal representation; ASN.1 codegen gap - see f1ap_ltm_wire_codec)
- * Inter-gNB-DU LTM handover scoped IEs:
- *   UE CONTEXT SETUP REQUEST:  LTMInformation-Setup, LTMConfigurationIDMappingList
- *   UE CONTEXT SETUP RESPONSE: LTMConfiguration, RequestedTargetCellID
- *   UE CONTEXT MODIFICATION REQUEST: LTMInformationModify, LTMConfigurationIDMappingList,
- *     LTMCellsToBeReleasedList, EarlySyncInformationRequest, LTMCFRAResourceConfigList,
- *     LTMResetInformation, LTMTCIStatesConfigurationsList, PC5 RLC channels to be released
- *   UE CONTEXT MODIFICATION RESPONSE: LTMConfiguration
- * Carried on the wire in ResourceCoordinationTransferContainer until F1AP Rel-18 codegen. */
+/* Rel-18 LTM IEs (internal representation; ASN.1 codegen gap - see f1ap_ltm_wire_codec) */
 #define F1AP_MAX_LTM_CONFIG_ID_MAPPING_LIST 8
-#define F1AP_MAX_LTM_CELLS_TO_BE_RELEASED 16
-#define F1AP_MAX_LTM_GNB_DU_IDS 8
-#define F1AP_MAX_LTM_CFRA_RESOURCE_CONFIG_LIST 8
-#define F1AP_MAX_LTM_TCI_STATES_CONFIGURATIONS 8
-#define F1AP_MAX_PC5_RLC_CHANNELS_TO_BE_RELEASED 8
-
-/* TS 38.473 Rel-18 Protocol IE IDs (for future native ASN.1 encode/decode) */
-#define F1AP_IE_ID_LTM_INFORMATION_SETUP 720
-#define F1AP_IE_ID_LTM_CONFIGURATION_ID_MAPPING_LIST 721
-#define F1AP_IE_ID_LTM_INFORMATION_MODIFY 722
-#define F1AP_IE_ID_LTM_CELLS_TO_BE_RELEASED_LIST 723
-#define F1AP_IE_ID_LTM_CONFIGURATION 725
-#define F1AP_IE_ID_REQUESTED_TARGET_CELL_ID 376 /* id-requestedTargetCellGlobalID (NRCGI) */
 
 typedef struct f1ap_reference_configuration_information_s {
   byte_array_t *cellGroupConfig; /* RRC CellGroupConfig OCTET STRING (optional) */
@@ -540,26 +519,9 @@ typedef struct f1ap_csi_resource_configuration_s {
   byte_array_t *configuration;
 } f1ap_csi_resource_configuration_t;
 
-typedef struct f1ap_ltm_tci_states_configurations_item_s {
-  byte_array_t *tci_states_configurations_list;
-} f1ap_ltm_tci_states_configurations_item_t;
-
-typedef struct f1ap_ltm_tci_states_configurations_list_s {
-  int len;
-  f1ap_ltm_tci_states_configurations_item_t *items;
-} f1ap_ltm_tci_states_configurations_list_t;
-
 typedef struct f1ap_ltm_configuration_s {
   f1ap_reference_configuration_t *reference_configuration;
   f1ap_csi_resource_configuration_t *csi_resource_configuration;
-  /* UE CONTEXT SETUP RESPONSE (TS 38.473 9.2.2.2) */
-  byte_array_t *ssb_information;
-  bool complete_candidate_configuration_indicator_present;
-  bool complete_candidate_configuration_indicator;
-  byte_array_t *ltm_cfra_resource_configuration;
-  byte_array_t *ltm_cfra_resource_configuration_for_sul;
-  f1ap_reference_configuration_information_t *reference_configuration_information;
-  f1ap_ltm_tci_states_configurations_list_t *tci_states_configurations_list;
 } f1ap_ltm_configuration_t;
 
 typedef struct f1ap_ltm_configuration_id_mapping_item_s {
@@ -575,55 +537,11 @@ typedef struct f1ap_ltm_configuration_id_mapping_list_s {
 
 typedef struct f1ap_ltm_information_setup_s {
   uint8_t setup_indication; /* LTM Indicator (TS 38.473 9.3.1.291) */
-  f1ap_reference_configuration_t *reference_configuration;
-  f1ap_csi_resource_configuration_t *csi_resource_configuration;
 } f1ap_ltm_information_setup_t;
-
-typedef struct f1ap_ltm_information_modify_s {
-  uint8_t ltm_indicator; /* LTMIndicator (mandatory) */
-  f1ap_reference_configuration_t *reference_configuration;
-  f1ap_csi_resource_configuration_t *csi_resource_configuration;
-} f1ap_ltm_information_modify_t;
-
-typedef struct f1ap_ltm_cells_to_be_released_list_s {
-  int len;
-  uint64_t *cell_ids; /* NRCellIdentity */
-} f1ap_ltm_cells_to_be_released_list_t;
-
-typedef struct f1ap_ltm_gnb_du_ids_list_s {
-  int len;
-  uint32_t *gnb_du_ids; /* LTMgNB-DUID */
-} f1ap_ltm_gnb_du_ids_list_t;
 
 typedef struct f1ap_early_sync_information_request_s {
   bool request_for_rach_configuration; /* RequestforRACHConfiguration (TS 38.473 9.3.1.326) */
-  f1ap_ltm_gnb_du_ids_list_t *ltm_gnb_du_ids_list;
 } f1ap_early_sync_information_request_t;
-
-typedef struct f1ap_ltm_cfra_resource_config_item_s {
-  uint64_t cell_id; /* CellID (mandatory) */
-  byte_array_t *ltm_cfra_resource_configuration;
-  byte_array_t *ltm_cfra_resource_configuration_for_sul;
-} f1ap_ltm_cfra_resource_config_item_t;
-
-typedef struct f1ap_ltm_cfra_resource_config_list_s {
-  int len;
-  f1ap_ltm_cfra_resource_config_item_t *items;
-} f1ap_ltm_cfra_resource_config_list_t;
-
-typedef struct f1ap_ltm_reset_information_s {
-  byte_array_t *configuration;
-} f1ap_ltm_reset_information_t;
-
-typedef struct f1ap_pc5_rlc_channel_to_be_released_item_s {
-  uint16_t pc5_rlc_channel_id;
-  uint16_t *remote_ue_local_id;
-} f1ap_pc5_rlc_channel_to_be_released_item_t;
-
-typedef struct f1ap_pc5_rlc_channel_to_be_released_list_s {
-  int len;
-  f1ap_pc5_rlc_channel_to_be_released_item_t *items;
-} f1ap_pc5_rlc_channel_to_be_released_list_t;
 
 typedef struct f1ap_early_ul_sync_configuration_s {
   uint8_t prachConfigurationIndex; /* INTEGER (0..63) */
@@ -703,16 +621,6 @@ typedef struct f1ap_ue_context_mod_req_t {
   f1ap_drb_to_release_t *drbs_rel;
 
   lower_layer_status_t *status;
-
-  /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.7) */
-  f1ap_ltm_information_modify_t *ltm_information_modify;
-  f1ap_ltm_configuration_id_mapping_list_t *ltm_configuration_id_mapping_list;
-  f1ap_ltm_cells_to_be_released_list_t *ltm_cells_to_be_released_list;
-  f1ap_early_sync_information_request_t *early_sync_information_request;
-  f1ap_ltm_cfra_resource_config_list_t *ltm_cfra_resource_config_list;
-  f1ap_ltm_reset_information_t *ltm_reset_information;
-  f1ap_ltm_tci_states_configurations_list_t *ltm_tci_states_configurations_list;
-  f1ap_pc5_rlc_channel_to_be_released_list_t *pc5_rlc_channels_to_be_released_list;
 } f1ap_ue_context_mod_req_t;
 
 typedef struct f1ap_ue_context_mod_resp {
@@ -726,9 +634,6 @@ typedef struct f1ap_ue_context_mod_resp {
 
   int srbs_len;
   f1ap_srb_setup_t *srbs;
-
-  /* Inter-gNB-DU LTM handover IEs (TS 38.473 9.2.2.8) */
-  f1ap_ltm_configuration_t *ltm_configuration;
 } f1ap_ue_context_mod_resp_t;
 
 typedef enum F1ap_Cause_e {

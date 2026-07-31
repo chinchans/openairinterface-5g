@@ -47,8 +47,6 @@
 
 int CU_send_UE_CONTEXT_SETUP_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue_context_setup_req_t *req)
 {
-  /* Inter-gNB-DU LTM handover: LTMInformation-Setup and LTMConfigurationIDMappingList
-   * (optional) are encoded via f1ap_ltm_wire_codec into ResourceCoordinationTransferContainer. */
   F1AP_F1AP_PDU_t *pdu = encode_ue_context_setup_req(req);
 
   uint8_t *buffer = NULL;
@@ -71,8 +69,6 @@ int CU_send_UE_CONTEXT_SETUP_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue_contex
 
 int CU_handle_UE_CONTEXT_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  /* Inter-gNB-DU LTM handover: LTMConfiguration and RequestedTargetCellID (optional)
-   * are decoded from ResourceCoordinationTransferContainer by decode_ue_context_setup_resp(). */
   f1ap_ue_context_setup_resp_t resp = {0};
   if (!decode_ue_context_setup_resp(pdu, &resp)) {
     LOG_E(F1AP, "cannot decode F1 UE Context Setup Resp\n");
@@ -142,9 +138,6 @@ int CU_handle_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance, sctp_assoc_t asso
 
 int CU_send_UE_CONTEXT_MODIFICATION_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue_context_mod_req_t *req)
 {
-  /* Inter-gNB-DU LTM handover: LTMInformationModify, LTMConfigurationIDMappingList,
-   * LTMCellsToBeReleasedList and related IEs (optional) are encoded via f1ap_ltm_wire_codec
-   * into ResourceCoordinationTransferContainer. */
   F1AP_F1AP_PDU_t *pdu = encode_ue_context_mod_req(req);
 
   uint8_t  *buffer=NULL;
@@ -161,8 +154,6 @@ int CU_send_UE_CONTEXT_MODIFICATION_REQUEST(sctp_assoc_t assoc_id, const f1ap_ue
 
 int CU_handle_UE_CONTEXT_MODIFICATION_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  /* Inter-gNB-DU LTM handover: LTMConfiguration (optional) is decoded from
-   * ResourceCoordinationTransferContainer by decode_ue_context_mod_resp(). */
   f1ap_ue_context_mod_resp_t resp = {0};
   if (!decode_ue_context_mod_resp(pdu, &resp)) {
     LOG_E(F1AP, "cannot decode F1 UE Context Modification Response\n");
